@@ -1547,7 +1547,7 @@ static ssize_t sink_name_store(struct device *dev,
 	if (size >= MAX_SINK_NAME)
 		return -EINVAL;
 
-	if (size == 1) {
+	if (size == 0) {
 		csdev->def_sink = NULL;
 		return size;
 	}
