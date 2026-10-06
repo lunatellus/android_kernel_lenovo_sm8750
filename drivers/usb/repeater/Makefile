@@ -4,3 +4,4 @@
 #
 obj-$(CONFIG_USB_REPEATER)		+= repeater.o
 obj-$(CONFIG_QTI_PMIC_EUSB2_REPEATER)	+= repeater-qti-pmic-eusb2.o
+obj-$(CONFIG_HQ_PTN3222_REPEATER)	+= hq_ptn3222_repeater.o

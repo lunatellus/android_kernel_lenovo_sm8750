@@ -22,4 +22,15 @@ config QTI_PMIC_EUSB2_REPEATER
 	  repeater for USB HS/FS/LS functionality where eUSB2 repeater is used.
 
 	  To compile this driver as a module, choose M here.
+
+config HQ_PTN3222_REPEATER
+	tristate "Huaqin I2C eUSB2 repeater driver"
+	depends on USB_REPEATER && I2C && UCSI_QTI_GLINK
+	select REGMAP_I2C
+	help
+	  Enable this to support I2C attached eUSB2 repeaters (NXP PTN3222
+	  and TI eUSB2) used on the Lenovo elden board.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called hq_ptn3222_repeater.
 endmenu

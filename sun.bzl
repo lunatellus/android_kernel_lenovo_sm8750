@@ -288,6 +288,7 @@ def define_sun():
         "drivers/usb/phy/phy-qcom-emu.ko",
         "drivers/usb/redriver/nb7vpq904m.ko",
         "drivers/usb/redriver/redriver.ko",
+        "drivers/usb/repeater/hq_ptn3222_repeater.ko",
         "drivers/usb/repeater/repeater.ko",
         "drivers/usb/repeater/repeater-qti-pmic-eusb2.ko",
         "drivers/usb/typec/ucsi/ucsi_qti_glink.ko",
