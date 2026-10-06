@@ -1047,10 +1047,15 @@ static int sched_sibling_cluster_handler(struct ctl_table *table, int write,
 				       loff_t *ppos)
 {
 	int ret = -EACCES, i = 0;
+	static bool initialized;
 	struct walt_sched_cluster *cluster;
+
+	if (write && initialized)
+		return ret;
 
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
 	if (!ret && write) {
+		initialized = true;
 		for_each_sched_cluster(cluster)
 			cluster->sibling_cluster = sysctl_sched_sibling_cluster_map[i++];
 	}

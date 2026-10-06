@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/syscore_ops.h>
@@ -1187,16 +1187,15 @@ static void migrate_busy_time_subtraction(struct task_struct *p, int new_cpu)
 	wallclock = walt_sched_clock();
 	walt_update_task_ravg(p, task_rq(p), TASK_MIGRATE, wallclock, 0);
 
-	/*
-	 * Update task's cycles wrt to the new cpu.
-	 */
-	wts->cpu_cycles = walt_get_cycle_counts_cb(new_cpu, wallclock);
-
 	if (wts->window_start != src_wrq->window_start)
 		WALT_BUG(WALT_BUG_WALT, p,
 				"CPU%d: %s task %s(%d)'s ws=%llu not equal to src_rq %d's ws=%llu",
 				raw_smp_processor_id(), __func__, p->comm, p->pid,
 				wts->window_start, src_rq->cpu, src_wrq->window_start);
+
+
+	/* safe to update the task cyc cntr for new_cpu without the new_cpu rq_lock */
+	update_task_cpu_cycles(p, new_cpu, wallclock);
 
 	new_task = is_new_task(p);
 	/* Protected by rq_lock */
@@ -2125,7 +2124,7 @@ static void update_trailblazer_accounting(struct task_struct *p, struct rq *rq,
 	bool is_prev_trailblazer = walt_flag_test(p, WALT_TRAILBLAZER_BIT);
 	u64 trailblazer_capacity;
 
-	if (!pipeline_in_progress() && walt_feat(WALT_FEAT_TRAILBLAZER_BIT) &&
+	if (walt_feat(WALT_FEAT_TRAILBLAZER_BIT) &&
 			(((runtime >= *demand) && (wts->high_util_history >= TRAILBLAZER_THRES)) ||
 			wts->high_util_history >= TRAILBLAZER_BYPASS)) {
 		*trailblazer_demand = 1 << SCHED_CAPACITY_SHIFT;
@@ -2164,69 +2163,6 @@ static void update_trailblazer_accounting(struct task_struct *p, struct rq *rq,
 	} else if (wts->high_util_history) {
 		wts->high_util_history -= FINAL_BUCKET_STEP_DOWN;
 	}
-}
-
-#define MIN_WINDOWS_FOR_LST	3ULL
-#define LST_ACTIVATION_TIMEOUT	250ULL
-#define LST_DELAY_MULTIPLIER	5
-/*
- * LST detection and timeout flow:
- * - For > 3 windows didn't receive any event thus marked as LST
- * - LST timeout
- * ms                                         ms   ms    ms    ms             ms
- * |        |         |         |         |    |    |     |     |              |
- * |        |         |         |         |    |    |     |     |              |
- * v--------|---------|---------|---------|----v----v-----v-----v--------------v
- *          |         |         |         |   LST(marked here)
- *          |         |         |         |    |                           |
- *       window    window    window    window  |<------------------------->|
- *          1         2         3         4    |  Task in LST state        |
- *								        LST timeout
- */
-static void update_lst(struct walt_task_struct *wts, u64 wallclock,
-		       int new_window)
-{
-	u64 lst_delay_factor;
-	u64 activity_target_hyst_ns = MIN_WINDOWS_FOR_LST * sched_ravg_window;
-
-	if ((wts->mark_start != 0) && ((wts->mark_start + activity_target_hyst_ns) < wallclock)) {
-		/*
-		 * task has been inactive for the threshold period treat it as
-		 * LST task.
-		 */
-		wts->lst = true;
-		wts->lst_state_counter++;
-
-		/* LST delay calculation based on how frequent task was in LST */
-		lst_delay_factor = min((wts->lst_state_counter  + LST_DELAY_MULTIPLIER)  /
-				       LST_DELAY_MULTIPLIER, 10);
-
-		/* target time after which task will come out of LST state */
-		wts->lst_tgt_ns = wallclock +
-			(LST_ACTIVATION_TIMEOUT * MSEC_TO_NSEC * lst_delay_factor);
-		wts->continuous_active = 0;
-	} else {
-		if (wts->lst_tgt_ns && (wts->lst_tgt_ns < wallclock)) {
-			wts->lst = false;
-			wts->lst_tgt_ns = 0;
-		}
-
-		wts->continuous_active++;
-
-		/*
-		 * reduce lst_state_counter for active task if task is active, this in-turn
-		 * influences calculation for LST delay.
-		 */
-		if (wts->continuous_active > 10) {
-			wts->lst_state_counter = max_t(s64, wts->lst_state_counter - 10, 0);
-			wts->continuous_active = 0;
-		}
-	}
-
-	/* tracking the number of windows where a task has encountered an event. */
-	if (new_window)
-		atomic_inc(&wts->event_windows);
-
 }
 
 /*
@@ -2391,7 +2327,6 @@ static u64 update_task_demand(struct task_struct *p, struct rq *rq,
 			       int event, u64 wallclock)
 {
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
-	struct walt_related_thread_group *rtg = wts->grp;
 	u64 mark_start = wts->mark_start;
 	struct walt_rq *wrq = &per_cpu(walt_rq, cpu_of(rq));
 	u64 delta, window_start = wrq->window_start;
@@ -2400,13 +2335,6 @@ static u64 update_task_demand(struct task_struct *p, struct rq *rq,
 	u64 runtime;
 
 	new_window = mark_start < window_start;
-	/*
-	 * activity count is only used for pipeline filtering
-	 * update activity count only if pipleine is in progress.
-	 */
-	if (pipeline_in_progress() && rtg && rtg->id == DEFAULT_CGROUP_COLOC_ID)
-		update_lst(wts, wallclock, new_window);
-
 	if (!account_busy_for_task_demand(rq, p, event)) {
 		if (new_window)
 			/*
@@ -2818,12 +2746,6 @@ static inline void __sched_fork_init(struct task_struct *p)
 	wts->load_boost		= 0;
 	wts->boosted_task_load	= 0;
 	wts->reduce_mask	= CPU_MASK_ALL;
-	wts->lst		= false;
-	wts->lst_tgt_ns		= 0;
-	wts->lst_state_counter	= 0;
-	wts->continuous_active	= 0;
-	wts->pipeline_activity_cnt = 0;
-	atomic_set(&wts->event_windows, 0);
 }
 
 static void init_new_task_load(struct task_struct *p)
@@ -5161,10 +5083,8 @@ static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 	/* IPC based smart FMAX */
 	cluster = cpu_cluster(cpu);
 	smart_freq_info = cluster->smart_freq_info;
-
 	if (smart_freq_init_done &&
-		smart_freq_info->smart_freq_ipc_participation_mask & IPC_PARTICIPATION
-		&& IS_ENABLED(CONFIG_ARM64_AMU_EXTN)) {
+		smart_freq_info->smart_freq_ipc_participation_mask & IPC_PARTICIPATION) {
 		last_ipc_level = per_cpu(ipc_level, cpu);
 		last_deactivate_ns = per_cpu(ipc_deactivate_ns, cpu);
 		ipc = calculate_ipc(cpu);
@@ -5206,20 +5126,11 @@ static void android_rvh_schedule(void *unused, struct task_struct *prev,
 {
 	u64 wallclock;
 	struct walt_task_struct *wts = (struct walt_task_struct *) prev->android_vendor_data1;
-	struct walt_rq *wrq = &per_cpu(walt_rq, cpu_of(rq));
 
 	if (unlikely(walt_disabled))
 		return;
 
 	wallclock = walt_rq_clock(rq);
-
-	/*
-	 * reset mvp arrival time as we are switching to non-CFS task
-	 * If rq is already in MVP throttling state then continue with
-	 * throttling until throttling time expires.
-	 */
-	if (!walt_fair_task(next))
-		wrq->mvp_arrival_time = 0;
 
 	if (likely(prev != next)) {
 		if (!prev->on_rq)
@@ -5312,10 +5223,8 @@ static void walt_do_sched_yield(void *unused, struct rq *rq)
 
 	walt_lockdep_assert_rq(rq, NULL);
 
-	if (!list_empty(&wts->mvp_list) && wts->mvp_list.next) {
-		if (!pipeline_in_progress() || !walt_pipeline_low_latency_task(curr))
-			walt_cfs_deactivate_mvp_task(rq, curr);
-	}
+	if (!list_empty(&wts->mvp_list) && wts->mvp_list.next)
+		walt_cfs_deactivate_mvp_task(rq, curr);
 
 	if (per_cpu(rt_task_arrival_time, cpu_of(rq)))
 		per_cpu(rt_task_arrival_time, cpu_of(rq)) = 0;
@@ -5581,6 +5490,18 @@ static void walt_init(struct work_struct *work)
 
 	stop_machine(walt_init_stop_handler, NULL, NULL);
 
+	/*
+	 * validate root-domain perf-domain is configured properly
+	 * to work with an asymmetrical soc. This is necessary
+	 * for load balance and task placement to work properly.
+	 * see walt_find_energy_efficient_cpu(), and
+	 * create_util_to_cost().
+	 */
+	if (!rcu_access_pointer(rd->pd) && num_sched_clusters > 1)
+		WALT_BUG(WALT_BUG_WALT, NULL,
+			 "root domain's perf-domain values not initialized rd->pd=%p.",
+			 rd->pd);
+
 	walt_register_sysctl();
 	walt_register_debugfs();
 
@@ -5617,7 +5538,7 @@ static int walt_module_init(void)
 	register_trace_android_vh_update_topology_flags_workfn(
 			android_vh_update_topology_flags_workfn, NULL);
 
-	if (topology_update_done)
+	if (topology_update_done && hyper_module_modprobe_finish)
 		schedule_work(&walt_init_work);
 
 	walt_cpufreq_cycle_cntr_driver_register();

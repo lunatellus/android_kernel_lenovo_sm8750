@@ -491,7 +491,6 @@ extern unsigned int sysctl_sched_sbt_enable;
 extern unsigned int sysctl_sched_sbt_delay_windows;
 
 extern cpumask_t cpus_for_pipeline;
-extern unsigned int pipeline_swap_util_th;
 
 /* WALT cpufreq interface */
 #define WALT_CPUFREQ_ROLLOVER_BIT		BIT(0)
@@ -1225,8 +1224,7 @@ static inline bool walt_flag_test(struct task_struct *p, unsigned int feature)
 #define WALT_RTG_MVP		0
 #define WALT_BINDER_MVP		1
 #define WALT_TASK_BOOST_MVP	2
-#define WALT_LL_MVP		3
-#define WALT_PIPELINE_MVP	4
+#define WALT_LL_PIPE_MVP	3
 
 #define WALT_NOT_MVP		-1
 
@@ -1522,17 +1520,20 @@ extern bool move_storage_load(struct rq *rq);
 #define MAX_YIELD_CNT_PER_TASK_THR		25
 #define	YIELD_INDUCED_SLEEP			BIT(7)
 #define YIELD_CNT_MASK				0x7F
+/*
+ * Threshold count under pipeline is more aggressive than normal threshold count as
+ * under pipeline condition tasks/threads yield for very short interval within a
+ * frame and thus doesn't hit higher threshold count.
+ */
+#define MAX_YIELD_CNT_GLOBAL_THR_DEFAULT	8000
+#define MAX_YIELD_CNT_GLOBAL_THR_PIPELINE	1000
 #define YIELD_WINDOW_SIZE_USEC			(16ULL * USEC_PER_MSEC)
 #define YIELD_WINDOW_SIZE_NSEC			(YIELD_WINDOW_SIZE_USEC * NSEC_PER_USEC)
 #define	YIELD_GRACE_PERIOD_NSEC			(4ULL * NSEC_PER_MSEC)
-#define YIELD_SLEEP_TIME_USEC			250
 #define MIN_CONTIGUOUS_YIELDING_WINDOW		3
-
-/* force frequent yielder threshold */
-#define FORCE_MAX_YIELD_CNT_GLOBAL_THR_DEFAULT	500
-#define FORCE_MIN_CONTIGUOUS_YIELDING_WINDOW	2
-#define FORCE_MAX_YIELD_SLEEP_CNT_GLOBAL_THR	4
-
+#define YIELD_SLEEP_TIME_USEC			250
+#define MAX_YIELD_SLEEP_CNT_GLOBAL_THR		(YIELD_WINDOW_SIZE_USEC /		\
+								YIELD_SLEEP_TIME_USEC / 2)
 /* yield boundary*/
 #define MIN_FRAME_YIELD_INTERVAL_NSEC		(1000ULL * NSEC_PER_USEC)
 #define YIELD_SLEEP_HEADROOM			300000ULL
@@ -1574,4 +1575,7 @@ DECLARE_PER_CPU(unsigned int, walt_yield_to_sleep);
 extern unsigned int walt_sched_yield_counter;
 extern unsigned int sysctl_force_frequent_yielder;
 void account_yields(u64 window_start);
+
+/* Set by lenovohyperSched.ko once its hooks are registered. */
+extern bool hyper_module_modprobe_finish;
 #endif /* _WALT_H */
