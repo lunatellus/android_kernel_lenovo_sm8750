@@ -5,7 +5,7 @@
  * Copyright (C) 2016 Linaro Ltd
  * Copyright (C) 2014 Sony Mobile Communications AB
  * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1510,7 +1510,6 @@ static int adsp_probe(struct platform_device *pdev)
 	}
 
 	qcom_q6v5_register_ssr_subdev(&adsp->q6v5, &adsp->ssr_subdev.subdev);
-	qcom_q6v5_register_glink_subdev(&adsp->q6v5, &adsp->glink_subdev.subdev);
 
 	qcom_add_glink_subdev(rproc, &adsp->glink_subdev, desc->ssr_name);
 	qcom_add_smd_subdev(rproc, &adsp->smd_subdev);
@@ -1599,45 +1598,6 @@ static const struct adsp_data adsp_resource_init = {
 		.ssctl_id = 0x14,
 };
 
-static const struct adsp_data sm6150_adsp_resource = {
-		.crash_reason_smem = 423,
-		.firmware_name = "adsp.mdt",
-		.pas_id = 1,
-		.minidump_id = 5,
-		.uses_elf64 = true,
-		.auto_boot = true,
-		.ssr_name = "lpass",
-		.sysmon_name = "adsp",
-		.ssctl_id = 0x14,
-};
-
-static const struct adsp_data sm6150_cdsp_resource = {
-		.crash_reason_smem = 601,
-		.firmware_name = "cdsp.mdt",
-		.pas_id = 18,
-		.minidump_id = 7,
-		.load_state = "cdsp",
-		.ssr_name = "cdsp",
-		.sysmon_name = "cdsp",
-		.ssctl_id = 0x17,
-		.uses_elf64 = true,
-		.auto_boot = true,
-		.smem_host_id = 5,
-};
-
-static const struct adsp_data sm6150_mpss_resource = {
-		.crash_reason_smem = 421,
-		.firmware_name = "modem.mdt",
-		.pas_id = 4,
-		.minidump_id = 3,
-		.load_state = "modem",
-		.ssr_name = "mpss",
-		.uses_elf64 = true,
-		.sysmon_name = "modem",
-		.ssctl_id = 0x12,
-		.auto_boot = false,
-};
-
 static const struct adsp_data sa8775p_adsp_resource = {
 	.crash_reason_smem = 423,
 	.firmware_name = "adsp.mbn",
@@ -1690,6 +1650,7 @@ static const struct adsp_data sm6350_adsp_resource = {
 	.crash_reason_smem = 423,
 	.firmware_name = "adsp.mdt",
 	.pas_id = 1,
+	.minidump_id = 5,
 	.auto_boot = true,
 	.proxy_pd_names = (char*[]){
 		"lcx",
@@ -1721,7 +1682,6 @@ static const struct adsp_data sm8250_adsp_resource = {
 	.crash_reason_smem = 423,
 	.firmware_name = "adsp.mdt",
 	.pas_id = 1,
-	.minidump_id = 5,
 	.auto_boot = true,
 	.proxy_pd_names = (char*[]){
 		"lcx",
@@ -1825,6 +1785,7 @@ static const struct adsp_data sm6350_cdsp_resource = {
 	.crash_reason_smem = 601,
 	.firmware_name = "cdsp.mdt",
 	.pas_id = 18,
+	.minidump_id = 7,
 	.auto_boot = true,
 	.proxy_pd_names = (char*[]){
 		"cx",
@@ -1899,7 +1860,6 @@ static const struct adsp_data sm8350_cdsp_resource = {
 	.crash_reason_smem = 601,
 	.firmware_name = "cdsp.mdt",
 	.pas_id = 18,
-	.minidump_id = 7,
 	.auto_boot = true,
 	.proxy_pd_names = (char*[]){
 		"cx",
@@ -2523,9 +2483,6 @@ static const struct of_device_id adsp_of_match[] = {
 	{ .compatible = "qcom,sdm845-cdsp-pas", .data = &sdm845_cdsp_resource_init},
 	{ .compatible = "qcom,sdm845-slpi-pas", .data = &sdm845_slpi_resource_init},
 	{ .compatible = "qcom,sdx55-mpss-pas", .data = &sdx55_mpss_resource},
-	{ .compatible = "qcom,sm6150-adsp-pas", .data = &sm6150_adsp_resource},
-	{ .compatible = "qcom,sm6150-cdsp-pas", .data = &sm6150_cdsp_resource},
-	{ .compatible = "qcom,sm6150-modem-pas", .data = &sm6150_mpss_resource},
 	{ .compatible = "qcom,sdxpinn-modem-pas", .data = &sdxpinn_mpss_resource},
 	{ .compatible = "qcom,sm6115-adsp-pas", .data = &adsp_resource_init},
 	{ .compatible = "qcom,sm6115-cdsp-pas", .data = &cdsp_resource_init},
