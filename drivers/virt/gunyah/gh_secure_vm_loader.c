@@ -69,6 +69,18 @@ const static struct {
 static DEFINE_SPINLOCK(gh_sec_vm_lock);
 static LIST_HEAD(gh_sec_vm_list);
 
+/*
+ * gh_legacy_firmware is used to determine whether the kernel is running
+ * on latest or legacy gunyah. This variable can be accessed from other
+ * files using gh_firmware_is_legacy().
+ */
+static bool gh_legacy_firmware;
+
+bool gh_firmware_is_legacy(void)
+{
+	return gh_legacy_firmware;
+}
+
 static inline enum gh_vm_names get_gh_vm_name(const char *str)
 {
 	int vmid;
@@ -746,6 +758,18 @@ err_of_node_put:
 	return ret;
 }
 
+static void gh_detect_legacy_firmware(void)
+{
+	int ret;
+
+	ret = gh_rm_vm_auth_image(VMID_HLOS, 0, NULL);
+	pr_err("Ignore previous errors about failed auth call\n");
+	gh_legacy_firmware = (ret == -EOPNOTSUPP);
+
+	if (gh_firmware_is_legacy())
+		pr_info("Detected legacy gunyah\n");
+}
+
 static int gh_secure_vm_loader_probe(struct platform_device *pdev)
 {
 	struct gh_sec_vm_dev *sec_vm_dev;
@@ -782,6 +806,8 @@ static int gh_secure_vm_loader_probe(struct platform_device *pdev)
 		dev_err(dev, "DT error getting \"qcom,vmid\": %d\n", ret);
 		return ret;
 	}
+
+	gh_detect_legacy_firmware();
 
 	if (gh_firmware_is_legacy()) {
 		const char *cpulist;
