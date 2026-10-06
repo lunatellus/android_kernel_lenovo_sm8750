@@ -80,10 +80,6 @@ __xhci_sideband_remove_endpoint(struct xhci_sideband *sb, struct xhci_virt_ep *e
 	 * Issue a stop endpoint command when an endpoint is removed.
 	 * The stop ep cmd handler will handle the ring cleanup.
 	 */
-
-	if (!ep || ep->sideband != sb)
-		return;
-
 	xhci_stop_endpoint_sync(sb->xhci, ep, 0, GFP_KERNEL);
 
 	ep->sideband = NULL;
@@ -110,9 +106,6 @@ xhci_sideband_add_endpoint(struct xhci_sideband *sb,
 {
 	struct xhci_virt_ep *ep;
 	unsigned int ep_index;
-
-	if (!sb)
-		return -ENODEV;
 
 	mutex_lock(&sb->mutex);
 	ep_index = xhci_get_endpoint_index(&host_ep->desc);
@@ -162,9 +155,6 @@ xhci_sideband_remove_endpoint(struct xhci_sideband *sb,
 {
 	struct xhci_virt_ep *ep;
 	unsigned int ep_index;
-
-	if (!sb)
-		return -ENODEV;
 
 	mutex_lock(&sb->mutex);
 	ep_index = xhci_get_endpoint_index(&host_ep->desc);
@@ -220,9 +210,6 @@ xhci_sideband_get_endpoint_buffer(struct xhci_sideband *sb,
 {
 	struct xhci_virt_ep *ep;
 	unsigned int ep_index;
-
-	if (!sb)
-		return NULL;
 
 	ep_index = xhci_get_endpoint_index(&host_ep->desc);
 	ep = sb->eps[ep_index];
@@ -410,13 +397,8 @@ EXPORT_SYMBOL_GPL(xhci_sideband_register);
 void
 xhci_sideband_unregister(struct xhci_sideband *sb)
 {
-	struct xhci_hcd *xhci;
+	struct xhci_hcd *xhci = sb->xhci;
 	int i;
-
-	if (!sb)
-		return;
-
-	xhci = sb->xhci;
 
 	mutex_lock(&sb->mutex);
 	for (i = 0; i < EP_CTX_PER_DEV; i++)
