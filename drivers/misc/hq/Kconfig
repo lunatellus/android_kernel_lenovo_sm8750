@@ -49,4 +49,14 @@ config HQ_REGISTER_DUMPER
 	  To compile this driver as a module, choose M here: the module will be
 	  called register_dumper.
 
+config HQ_MAGIC_KEY
+	tristate "Huaqin magic key debug trigger"
+	depends on INPUT
+	help
+	  Watches a key sequence on input devices and, when it completes,
+	  either triggers a panic or dumps uninterruptible tasks for debugging.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called magic_key.
+
 endmenu

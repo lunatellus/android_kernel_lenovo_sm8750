@@ -49,6 +49,7 @@ regmap-spmi.ko
 qti-regmap-debugfs.ko
 hq_kallsyms.ko
 register_dumper.ko
+magic_key.ko
 qcom-spmi-pmic.ko
 nvmem_qcom-spmi-sdam.ko
 rtc-pm8xxx.ko
