@@ -7,6 +7,9 @@
 #define pr_fmt(fmt)	"UCSI: %s: " fmt, __func__
 
 #include <clocksource/arm_arch_timer.h>
+#include <linux/delay.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/ipc_logging.h>
@@ -98,8 +101,9 @@ struct ucsi_dev {
 	struct work_struct		unregister_work;
 	atomic_t			state;
 	bool				remoteproc_timestamp_en;
-};
+	u64				lenovo_state_reserved;
 
+};
 struct remoteproc_ts {
 	u32	hh;
 	u32	mm;
@@ -108,6 +112,20 @@ struct remoteproc_ts {
 };
 
 static void *ucsi_ipc_log;
+/* unsigned int as in stock: its modversions CRC (0x769ff8e8) is what
+ * fsa4480-i2c and fsa4480-sub-i2c import.
+ */
+unsigned int cc_port_num = 0;
+int cc_port_num_1 = 0;
+int cc_port_num_2 = 0;
+int C1_d_present = 0;
+int C2_d_present = 0;
+int con_now = 0;
+
+EXPORT_SYMBOL(cc_port_num);
+EXPORT_SYMBOL(C1_d_present);
+EXPORT_SYMBOL(C2_d_present);
+EXPORT_SYMBOL(con_now);
 static RAW_NOTIFIER_HEAD(ucsi_glink_notifier);
 
 int register_ucsi_glink_notifier(struct notifier_block *nb)
@@ -186,12 +204,127 @@ static void ucsi_log(struct ucsi_dev *udev, const char *prefix,
 
 static int handle_ucsi_read_ack(struct ucsi_dev *udev, void *data, size_t len)
 {
+	struct ucsi_read_buf_resp_msg *msg_ptr = data;
+	struct ucsi_connector_status *status;
+	u8 port_num;
+	u16 change;
+	int flag;
+	u8 partner_type;
+	bool usb;
+	u8 opmode;
+	u8 dev_type;
+	int gpio_value;
+
 	if (len != sizeof(udev->rx_buf)) {
 		pr_err("Incorrect received length %zu expected %zu\n", len,
 			sizeof(udev->rx_buf));
 		atomic_set(&udev->rx_valid, 0);
 		return -EINVAL;
 	}
+
+	port_num = UCSI_CCI_CONNECTOR(msg_ptr->buf[UCSI_CCI]);
+	status = (struct ucsi_connector_status *)&msg_ptr->buf[UCSI_MESSAGE_IN];
+	change = status->change;
+	flag = (msg_ptr->buf[UCSI_MESSAGE_IN + 3] << 8) |
+		msg_ptr->buf[UCSI_MESSAGE_IN + 2];
+	partner_type = UCSI_CONSTAT_PARTNER_TYPE(flag);
+	usb = UCSI_CONSTAT_PARTNER_FLAGS(flag) & UCSI_CONSTAT_PARTNER_FLAG_USB;
+	opmode = UCSI_CONSTAT_PWR_OPMODE(flag);
+
+	if (port_num && change && usb) {
+		if ((partner_type == 1 || partner_type == 2) &&
+		    (opmode == 4 || opmode == 5 || opmode == 1))
+			dev_type = 0;
+		else if ((partner_type == 1 && opmode == 3) ||
+			 ((opmode == 4 || opmode == 5 || opmode == 1) &&
+			  partner_type == 0))
+			dev_type = 1;
+		else if (opmode != 0 && opmode != 2 && partner_type == 4)
+			dev_type = 2;
+		else if (partner_type == 2 && opmode == 3)
+			dev_type = 3;
+		else if (partner_type == 6)
+			dev_type = 5;
+		else
+			dev_type = 6;
+	} else if (port_num && change && !usb) {
+		if (partner_type == 4 && opmode == 3)
+			dev_type = 3;
+		else if ((partner_type == 1 || partner_type == 2) && opmode == 3)
+			dev_type = 4;
+		else if (partner_type == 6)
+			dev_type = 5;
+		else
+			dev_type = 6;
+	} else {
+		dev_type = 8;
+	}
+	if (port_num && change && flag == 0)
+		dev_type = 7;
+
+	switch (dev_type) {
+	case 0:
+		if (port_num == 1)
+			C1_d_present = 1;
+		else if (port_num == 2)
+			C2_d_present = 1;
+		break;
+	case 1:
+		if (port_num == 1)
+			C1_d_present = 1;
+		else if (port_num == 2)
+			C2_d_present = 1;
+		break;
+	case 2:
+		if (port_num == 1)
+			C1_d_present = 1;
+		else if (port_num == 2)
+			C2_d_present = 1;
+		break;
+	case 3:
+		if (port_num == 1)
+			C1_d_present = 0;
+		break;
+	case 4:
+		if (port_num == 1)
+			C1_d_present = 0;
+		else if (port_num == 2)
+			C2_d_present = 0;
+		break;
+	case 5:
+		if (port_num == 1)
+			C1_d_present = 0;
+		else if (port_num == 2)
+			C2_d_present = 0;
+		break;
+	case 7:
+		if (port_num == 1)
+			C1_d_present = 0;
+		else if (port_num == 2)
+			C2_d_present = 0;
+		break;
+	default:
+		break;
+	}
+
+	if (C1_d_present == 1 && C2_d_present == 0) {
+		gpio_direction_output(541, 0);
+		mdelay(10);
+	} else if (C1_d_present == 0 && C2_d_present == 1) {
+		gpio_direction_output(541, 1);
+		mdelay(10);
+	} else if (C1_d_present == 1 && C2_d_present == 1) {
+		gpio_direction_output(541, 0);
+		mdelay(10);
+	}
+	gpio_value = gpio_get_value(541);
+
+	cc_port_num_2 = port_num;
+	cc_port_num = cc_port_num_1 | cc_port_num_2;
+	if (port_num)
+		pr_info("[LENOVO_UCSI] port_num = %d, change = 0x%04X, flag = 0x%04X, partner_type = %d, usb = %d, opmode = %d, dev_type = %d, c1_data = %d, c2_data = %d, gpio = %d\n",
+			port_num, change, flag, partner_type, usb, opmode,
+			dev_type, C1_d_present, C2_d_present, gpio_value);
 
 	memcpy(&udev->rx_buf, data, sizeof(udev->rx_buf));
 	if (udev->rx_buf.ret_code) {
@@ -265,6 +398,8 @@ static int handle_ucsi_notify(struct ucsi_dev *udev, void *data, size_t len)
 	}
 
 	con_num = UCSI_CCI_CONNECTOR(cci);
+	cc_port_num_1 = con_num;
+	cc_port_num = cc_port_num_2 | con_num;
 	pr_debug("con_num: %u num_connectors: %u\n", con_num,
 		udev->ucsi->cap.num_connectors);
 
@@ -325,6 +460,8 @@ static int ucsi_qti_glink_write(struct ucsi_dev *udev, unsigned int offset,
 			       const void *val, size_t val_len, bool sync)
 {
 	struct ucsi_write_buf_req_msg ucsi_buf = { { 0 } };
+	unsigned long timeout;
+	u64 control;
 	int rc;
 
 	if (!validate_ucsi_msg(offset, val_len))
@@ -368,8 +505,14 @@ static int ucsi_qti_glink_write(struct ucsi_dev *udev, unsigned int offset,
 	}
 
 	if (sync) {
+		timeout = msecs_to_jiffies(UCSI_WAIT_TIME_MS);
+		if (val) {
+			control = *(const u64 *)val;
+			if (control == 0x02820009 || control == 0x03020009)
+				timeout = msecs_to_jiffies(1000);
+		}
 		rc = wait_for_completion_timeout(&udev->sync_write_ack,
-					msecs_to_jiffies(UCSI_WAIT_TIME_MS));
+					timeout);
 		if (!rc) {
 			pr_err("timed out for sync_write_ack\n");
 			rc = -ETIMEDOUT;
@@ -533,6 +676,8 @@ static int ucsi_qti_read(struct ucsi *ucsi, unsigned int offset,
 	atomic_set(&udev->rx_valid, 0);
 	ucsi_log(udev, "read:", offset, (u8 *)val, val_len);
 	ucsi_qti_notify(udev, offset, val, val_len);
+	if (val_len == sizeof(u32) && *(u8 *)val)
+		con_now = *(u8 *)val >> 1;
 
 out:
 	mutex_unlock(&udev->read_lock);
