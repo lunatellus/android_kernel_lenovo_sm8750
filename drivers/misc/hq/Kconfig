@@ -20,4 +20,14 @@ config HQ_KALLSYMS
 	  To compile this driver as a module, choose M here: the module will be
 	  called hq_kallsyms.
 
+config HQ_UFSFFU
+	tristate "Huaqin UFS field firmware update"
+	depends on SCSI_UFSHCD
+	help
+	  Loads an OEM UFS firmware table and performs UFS field firmware
+	  updates (FFU) with SCSI WRITE BUFFER commands for matching devices.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called ufsffu.
+
 endmenu

@@ -113,6 +113,7 @@ def define_sun():
         "drivers/mfd/qcom-spmi-pmic.ko",
         "drivers/misc/hq/hq_kallsyms/hq_kallsyms.ko",
         "drivers/misc/hq/hqsysfs/hqsysfs.ko",
+        "drivers/misc/hq/memory/ffu/ufsffu.ko",
         "drivers/misc/qseecom_proxy.ko",
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",
