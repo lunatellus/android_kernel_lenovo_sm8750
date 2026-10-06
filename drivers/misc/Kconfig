@@ -605,4 +605,5 @@ source "drivers/misc/uacce/Kconfig"
 source "drivers/misc/pvpanic/Kconfig"
 source "drivers/misc/mchp_pci1xxxx/Kconfig"
 source "drivers/misc/hq/Kconfig"
+source "drivers/misc/awinic/haptic_hv/Kconfig"
 endmenu
