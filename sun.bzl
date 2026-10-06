@@ -111,6 +111,7 @@ def define_sun():
         "drivers/mailbox/qcom-ipcc.ko",
         "drivers/mfd/qcom-i2c-pmic.ko",
         "drivers/mfd/qcom-spmi-pmic.ko",
+        "drivers/misc/hq/hq_kallsyms/hq_kallsyms.ko",
         "drivers/misc/hq/hqsysfs/hqsysfs.ko",
         "drivers/misc/qseecom_proxy.ko",
         "drivers/mmc/host/cqhci.ko",

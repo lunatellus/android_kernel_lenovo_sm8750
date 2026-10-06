@@ -11,4 +11,13 @@ config HQ_SYSFS
 	  To compile this driver as a module, choose M here: the module will be
 	  called hqsysfs.
 
+config HQ_KALLSYMS
+	tristate "Huaqin kallsyms helper"
+	help
+	  Exports hq_kallsyms_lookup_name() to vendor modules, resolving
+	  kallsyms_lookup_name() through a kprobe because GKI does not export it.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called hq_kallsyms.
+
 endmenu
