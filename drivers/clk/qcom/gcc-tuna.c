@@ -25,8 +25,8 @@
 #include "reset.h"
 #include "vdd-level.h"
 
-static DEFINE_VDD_REGULATORS(vdd_cx, VDD_HIGH + 1, 1, vdd_corner);
-static DEFINE_VDD_REGULATORS(vdd_mx, VDD_HIGH + 1, 1, vdd_corner);
+static DEFINE_VDD_REGULATORS(vdd_cx, VDD_HIGH_L1 + 1, 1, vdd_corner);
+static DEFINE_VDD_REGULATORS(vdd_mx, VDD_HIGH_L1 + 1, 1, vdd_corner);
 
 static struct clk_vdd_class *gcc_tuna_regulators[] = {
 	&vdd_cx,
@@ -1185,6 +1185,15 @@ static const struct freq_tbl ftbl_gcc_ufs_phy_axi_clk_src[] = {
 	F(25000000, P_GCC_GPLL0_OUT_EVEN, 12, 0, 0),
 	F(100000000, P_GCC_GPLL0_OUT_EVEN, 3, 0, 0),
 	F(201500000, P_GCC_GPLL4_OUT_MAIN, 4, 0, 0),
+	F(322400000, P_GCC_GPLL4_OUT_MAIN, 2.5, 0, 0),
+	F(403000000, P_GCC_GPLL4_OUT_MAIN, 2, 0, 0),
+	{ }
+};
+
+static const struct freq_tbl ftbl_gcc_ufs_phy_axi_clk_src_tuna_v1[] = {
+	F(25000000, P_GCC_GPLL0_OUT_EVEN, 12, 0, 0),
+	F(100000000, P_GCC_GPLL0_OUT_EVEN, 3, 0, 0),
+	F(201500000, P_GCC_GPLL4_OUT_MAIN, 4, 0, 0),
 	F(403000000, P_GCC_GPLL4_OUT_MAIN, 2, 0, 0),
 	{ }
 };
@@ -1211,7 +1220,8 @@ static struct clk_rcg2 gcc_ufs_phy_axi_clk_src = {
 		.rate_max = (unsigned long[VDD_NUM]) {
 			[VDD_LOWER] = 100000000,
 			[VDD_LOW] = 201500000,
-			[VDD_NOMINAL] = 403000000},
+			[VDD_NOMINAL] = 322400000,
+			[VDD_HIGH_L1] = 403000000},
 	},
 };
 
@@ -1783,32 +1793,6 @@ static struct clk_branch gcc_gpu_gpll0_div_cph_clk_src = {
 			},
 			.num_parents = 1,
 			.flags = CLK_SET_RATE_PARENT,
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch gcc_gpu_smmu_vote_clk = {
-	.halt_reg = 0x7d000,
-	.halt_check = BRANCH_HALT_VOTED,
-	.clkr = {
-		.enable_reg = 0x7d000,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gcc_gpu_smmu_vote_clk",
-			.ops = &clk_branch2_ops,
-		},
-	},
-};
-
-static struct clk_branch gcc_mmu_tcu_vote_clk = {
-	.halt_reg = 0x7d02c,
-	.halt_check = BRANCH_HALT_VOTED,
-	.clkr = {
-		.enable_reg = 0x7d02c,
-		.enable_mask = BIT(0),
-		.hw.init = &(const struct clk_init_data) {
-			.name = "gcc_mmu_tcu_vote_clk",
 			.ops = &clk_branch2_ops,
 		},
 	},
@@ -3054,8 +3038,6 @@ static struct clk_regmap *gcc_tuna_clocks[] = {
 	[GCC_GPU_GEMNOC_GFX_CLK] = &gcc_gpu_gemnoc_gfx_clk.clkr,
 	[GCC_GPU_GPLL0_CPH_CLK_SRC] = &gcc_gpu_gpll0_cph_clk_src.clkr,
 	[GCC_GPU_GPLL0_DIV_CPH_CLK_SRC] = &gcc_gpu_gpll0_div_cph_clk_src.clkr,
-	[GCC_GPU_SMMU_VOTE_CLK] = &gcc_gpu_smmu_vote_clk.clkr,
-	[GCC_MMU_TCU_VOTE_CLK] = &gcc_mmu_tcu_vote_clk.clkr,
 	[GCC_PCIE_0_AUX_CLK] = &gcc_pcie_0_aux_clk.clkr,
 	[GCC_PCIE_0_AUX_CLK_SRC] = &gcc_pcie_0_aux_clk_src.clkr,
 	[GCC_PCIE_0_CFG_AHB_CLK] = &gcc_pcie_0_cfg_ahb_clk.clkr,
@@ -3240,9 +3222,31 @@ static const struct qcom_cc_desc gcc_tuna_desc = {
 
 static const struct of_device_id gcc_tuna_match_table[] = {
 	{ .compatible = "qcom,tuna-gcc" },
+	{ .compatible = "qcom,tuna-gcc-v1" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, gcc_tuna_match_table);
+
+static void gcc_tuna_fixup_tunav1(struct regmap *regmap)
+{
+	gcc_ufs_phy_axi_clk_src.freq_tbl = ftbl_gcc_ufs_phy_axi_clk_src_tuna_v1;
+	gcc_ufs_phy_axi_clk_src.clkr.vdd_data.rate_max[VDD_NOMINAL] = 403000000;
+}
+
+static int gcc_tuna_fixup(struct platform_device *pdev, struct regmap *regmap)
+{
+	const char *compat = NULL;
+	int compatlen = 0;
+
+	compat = of_get_property(pdev->dev.of_node, "compatible", &compatlen);
+	if (!compat || compatlen <= 0)
+		return -EINVAL;
+
+	if (!strcmp(compat, "qcom,tuna-gcc-v1"))
+		gcc_tuna_fixup_tunav1(regmap);
+
+	return 0;
+}
 
 static int gcc_tuna_probe(struct platform_device *pdev)
 {
@@ -3252,6 +3256,10 @@ static int gcc_tuna_probe(struct platform_device *pdev)
 	regmap = qcom_cc_map(pdev, &gcc_tuna_desc);
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
+
+	ret = gcc_tuna_fixup(pdev, regmap);
+	if (ret)
+		return ret;
 
 	ret = qcom_cc_register_rcg_dfs(regmap, gcc_dfs_clocks,
 				       ARRAY_SIZE(gcc_dfs_clocks));

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -972,6 +972,18 @@ static const struct freq_tbl ftbl_disp_cc_mdss_mdp_clk_src[] = {
 	F(417000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
 	F(535000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
 	F(600000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	{ }
+};
+
+static const struct freq_tbl ftbl_disp_cc_mdss_mdp_clk_src_tuna_v1[] = {
+	F(85714286, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(100000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(140000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(207000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(342000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(417000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(535000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
+	F(600000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
 	F(660000000, P_DISP_CC_PLL0_OUT_MAIN, 3, 0, 0),
 	{ }
 };
@@ -1019,8 +1031,7 @@ static struct clk_rcg2 disp_cc_mdss_mdp_clk_src = {
 			[VDD_LOW] = 342000000,
 			[VDD_LOW_L1] = 417000000,
 			[VDD_NOMINAL] = 535000000,
-			[VDD_NOMINAL_L1] = 600000000,
-			[VDD_HIGH] = 660000000},
+			[VDD_NOMINAL_L1] = 600000000},
 	},
 };
 
@@ -2378,10 +2389,17 @@ static struct qcom_cc_desc disp_cc_tuna_desc = {
 
 static const struct of_device_id disp_cc_tuna_match_table[] = {
 	{ .compatible = "qcom,tuna-dispcc" },
+	{ .compatible = "qcom,tuna-dispcc-v1" },
 	{ .compatible = "qcom,kera-dispcc" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, disp_cc_tuna_match_table);
+
+static void disp_cc_tuna_fixup_tunav1(struct regmap *regmap)
+{
+	disp_cc_mdss_mdp_clk_src.freq_tbl = ftbl_disp_cc_mdss_mdp_clk_src_tuna_v1;
+	disp_cc_mdss_mdp_clk_src.clkr.vdd_data.rate_max[VDD_HIGH] = 660000000;
+}
 
 static void disp_cc_tuna_fixup_kera(struct regmap *regmap)
 {
@@ -2399,6 +2417,9 @@ static int disp_cc_tuna_fixup(struct platform_device *pdev, struct regmap *regma
 	compat = of_get_property(pdev->dev.of_node, "compatible", &compatlen);
 	if (!compat || compatlen <= 0)
 		return -EINVAL;
+
+	if (!strcmp(compat, "qcom,tuna-dispcc-v1"))
+		disp_cc_tuna_fixup_tunav1(regmap);
 
 	if (!strcmp(compat, "qcom,kera-dispcc"))
 		disp_cc_tuna_fixup_kera(regmap);
