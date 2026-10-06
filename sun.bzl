@@ -121,6 +121,7 @@ def define_sun():
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",
         "drivers/net/hq_mii.ko",
+        "drivers/net/phy/hq_smsc.ko",
         "drivers/nvmem/nvmem_qcom-spmi-sdam.ko",
         "drivers/nvmem/nvmem_qfprom.ko",
         "drivers/pci/controller/pci-msm-drv.ko",

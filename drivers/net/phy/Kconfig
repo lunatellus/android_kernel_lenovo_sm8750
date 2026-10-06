@@ -354,6 +354,13 @@ config SMSC_PHY
 	help
 	  Currently supports the LAN83C185, LAN8187 and LAN8700 PHYs
 
+config HQ_SMSC_PHY
+	tristate "Huaqin SMSC PHYs"
+	select CRC16
+	help
+	  Huaqin copy of the SMSC PHY driver used by the Lenovo smsc95xx
+	  driver.
+
 config STE10XP
 	tristate "STMicroelectronics STe10Xp PHYs"
 	help
