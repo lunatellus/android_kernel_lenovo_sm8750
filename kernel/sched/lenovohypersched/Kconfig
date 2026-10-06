@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config LENOVO_HYPERSCHED
+	tristate "Lenovo hyper scheduler"
+	depends on SMP
+	help
+	  Lenovo task boosting and UX scheduling extensions built on Android
+	  scheduler vendor hooks. Controlled through /proc/lenovo_hyperschedule.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called lenovohyperSched.

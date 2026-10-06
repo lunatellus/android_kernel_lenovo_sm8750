@@ -292,6 +292,7 @@ def define_sun():
         "drivers/virt/gunyah/gh_virt_wdt.ko",
         "drivers/virt/gunyah/gunyah_loader.ko",
         "kernel/msm_sysstats.ko",
+        "kernel/sched/lenovohypersched/lenovohyperSched.ko",
         "kernel/sched/walt/sched-walt.ko",
         "kernel/trace/qcom_ipc_logging.ko",
         "net/mac80211/mac80211.ko",
