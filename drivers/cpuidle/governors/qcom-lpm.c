@@ -3,7 +3,7 @@
  * Copyright (C) 2006-2007 Adam Belay <abelay@novell.com>
  * Copyright (C) 2009 Intel Corporation
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cpu.h>
@@ -394,10 +394,11 @@ static void update_cpu_history(struct lpm_cpu *cpu_gov)
 		lpm_history->samples_idx = 0;
 }
 
-void update_ipi_history(int cpu, ktime_t now)
+void update_ipi_history(int cpu)
 {
 	struct lpm_cpu *cpu_gov = per_cpu_ptr(&lpm_cpu_data, cpu);
 	struct history_ipi *history = &cpu_gov->ipi_history;
+	ktime_t now = ktime_get();
 
 	history->interval[history->current_ptr] =
 			ktime_to_us(ktime_sub(now,
@@ -443,12 +444,6 @@ static int lpm_offline_cpu(unsigned int cpu)
 	if (!dev || !cpu_gov)
 		return 0;
 
-	cpu_gov->next_wakeup = KTIME_MAX - 1;
-	cpu_gov->cpu_off_invoked = true;
-
-	if (cluster_gov_ops && cluster_gov_ops->select)
-		cluster_gov_ops->select(cpu_gov);
-
 	dev_pm_qos_remove_notifier(dev, &cpu_gov->nb,
 				   DEV_PM_QOS_RESUME_LATENCY);
 
@@ -463,7 +458,6 @@ static int lpm_online_cpu(unsigned int cpu)
 	if (!dev || !cpu_gov)
 		return 0;
 
-	cpu_gov->cpu_off_invoked = false;
 	cpu_gov->nb.notifier_call = lpm_cpu_qos_notify;
 	dev_pm_qos_add_notifier(dev, &cpu_gov->nb,
 				DEV_PM_QOS_RESUME_LATENCY);
@@ -480,7 +474,6 @@ static void ipi_raise(void *ignore, const struct cpumask *mask, const char *unus
 	if (suspend_in_progress)
 		return;
 
-	ktime_t now = ktime_get();
 	for_each_cpu(cpu, mask) {
 		cpu_gov = &(per_cpu(lpm_cpu_data, cpu));
 		if (!cpu_gov->enable)
@@ -488,8 +481,8 @@ static void ipi_raise(void *ignore, const struct cpumask *mask, const char *unus
 
 		spin_lock_irqsave(&cpu_gov->lock, flags);
 		cpu_gov->ipi_pending = true;
-		update_ipi_history(cpu, now);
 		spin_unlock_irqrestore(&cpu_gov->lock, flags);
+		update_ipi_history(cpu);
 	}
 }
 
@@ -592,9 +585,6 @@ static int lpm_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 	int i = 0;
 
 	if (!cpu_gov)
-		return 0;
-
-	if (cpu_gov->cpu_off_invoked)
 		return 0;
 
 	do_div(latency_req, NSEC_PER_USEC);
