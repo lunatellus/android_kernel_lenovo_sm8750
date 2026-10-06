@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2015, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef LINUX_MMC_CQHCI_H
 #define LINUX_MMC_CQHCI_H
@@ -97,12 +97,6 @@
 
 /* send status config 2 */
 #define CQHCI_SSC2			0x44
-
-/*
- * Value n means CQE would send CMD13 during the transfer of data block
- * BLOCK_CNT-n
- */
-#define SEND_QSR_INTERVAL 0x70001
 
 /* response for dcmd */
 #define CQHCI_CRDCT			0x48
