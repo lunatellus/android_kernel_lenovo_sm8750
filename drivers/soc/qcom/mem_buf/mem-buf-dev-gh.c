@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
-#include <linux/gunyah/gh_rm_drv.h>
+
 #include <soc/qcom/secure_buffer.h>
 
 #include "mem-buf-dev.h"
@@ -314,12 +314,10 @@ err_free_sgt:
 
 static bool mem_buf_valid_sgt(struct sg_table *sgt)
 {
+#if defined(CONFIG_GUNYAH_LEGACY)
 	int i;
 	size_t size;
 	struct scatterlist *sgl;
-
-	if (!gh_firmware_is_legacy())
-		return true;
 
 	/* Physically contiguous memory only */
 	if (sgt->nents > 1) {
@@ -336,6 +334,7 @@ static bool mem_buf_valid_sgt(struct sg_table *sgt)
 					size);
 		return false;
 	}
+#endif
 	return true;
 }
 
