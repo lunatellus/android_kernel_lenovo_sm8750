@@ -575,6 +575,7 @@ struct ufs_qcom_host {
 	struct ufs_vreg *vccq_proxy_client;
 	bool work_pending;
 	bool bypass_g4_cfgready;
+	bool is_dt_pm_level_read;
 	bool is_phy_pwr_on;
 	/* Protect the usage of is_phy_pwr_on against racing */
 	struct mutex phy_mutex;
@@ -618,7 +619,6 @@ struct ufs_qcom_host {
 	bool irq_affinity_support;
 	bool esi_enabled;
 	bool enforce_high_irq_cpus;
-	bool cap_hs_gear_limit;
 
 	bool bypass_pbl_rst_wa;
 	atomic_t cqhp_update_pending;

@@ -466,8 +466,6 @@ static int ufs_qcom_get_pwr_dev_param(struct ufs_qcom_dev_params *qcom_param,
 	int min_dev_gear;
 	bool is_dev_sup_hs = false;
 	bool is_qcom_max_hs = false;
-	struct ufs_qcom_host *host =
-		container_of(qcom_param, struct ufs_qcom_host, host_pwr_cap);
 
 	if (dev_max->pwr_rx == FAST_MODE)
 		is_dev_sup_hs = true;
@@ -539,12 +537,6 @@ static int ufs_qcom_get_pwr_dev_param(struct ufs_qcom_dev_params *qcom_param,
 	else
 		agreed_pwr->gear_rx = agreed_pwr->gear_tx = min_qcom_gear;
 
-	if (host->cap_hs_gear_limit && is_qcom_max_hs) {
-		dev_info(host->hba->dev, "Gear limit active: setting to UFS_HS_G1\n");
-		agreed_pwr->gear_rx = agreed_pwr->gear_tx =
-			min_qcom_gear = UFS_HS_G1;
-	}
-
 	agreed_pwr->hs_rate = qcom_param->hs_rate;
 	return 0;
 }
@@ -590,19 +582,8 @@ static int ufs_qcom_get_connected_rx_lanes(struct ufs_hba *hba, u32 *rx_lanes)
 
 static inline void ufs_qcom_ice_enable(struct ufs_qcom_host *host)
 {
-	int err;
-
-	if (host->hba->caps & UFSHCD_CAP_CRYPTO) {
-		err = qcom_ice_enable(host->ice);
-
-		if (err) {
-			dev_warn(
-				host->hba->dev,
-				"ICE could not be enabled err=%d. Disabling inline encryption support.\n",
-				err);
-			host->hba->caps &= ~UFSHCD_CAP_CRYPTO;
-		}
-	}
+	if (host->hba->caps & UFSHCD_CAP_CRYPTO)
+		qcom_ice_enable(host->ice);
 }
 
 static int ufs_qcom_ice_init(struct ufs_qcom_host *host)
@@ -628,20 +609,9 @@ static int ufs_qcom_ice_init(struct ufs_qcom_host *host)
 
 static inline int ufs_qcom_ice_resume(struct ufs_qcom_host *host)
 {
-	int err;
+	if (host->hba->caps & UFSHCD_CAP_CRYPTO)
+		return qcom_ice_resume(host->ice);
 
-	if (host->hba->caps & UFSHCD_CAP_CRYPTO) {
-		err = qcom_ice_resume(host->ice);
-
-		if (err) {
-			dev_warn(
-				host->hba->dev,
-				"ICE could not be resumed err=%d. Disabling inline encryption support.\n",
-				err);
-			host->hba->caps &= ~UFSHCD_CAP_CRYPTO;
-		}
-		return err;
-	}
 	return 0;
 }
 
@@ -2470,9 +2440,13 @@ static void ufs_qcom_parse_pm_levels(struct ufs_hba *hba)
 {
 	struct device *dev = hba->dev;
 	struct device_node *np = dev->of_node;
+	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	enum ufs_pm_level rpm_lvl = UFS_PM_LVL_MAX, spm_lvl = UFS_PM_LVL_MAX;
 
 	if (!np)
+		return;
+
+	if (host->is_dt_pm_level_read)
 		return;
 
 	if (!of_property_read_u32(np, "rpm-level", &rpm_lvl) &&
@@ -2481,7 +2455,7 @@ static void ufs_qcom_parse_pm_levels(struct ufs_hba *hba)
 	if (!of_property_read_u32(np, "spm-level", &spm_lvl) &&
 		ufshcd_is_valid_pm_lvl(spm_lvl))
 		hba->spm_lvl = spm_lvl;
-
+	host->is_dt_pm_level_read = true;
 }
 
 static void ufs_qcom_override_pa_tx_hsg1_sync_len(struct ufs_hba *hba)
@@ -5932,34 +5906,6 @@ static ssize_t boost_monitor_timer_ms_show(struct device *dev,
 
 static DEVICE_ATTR_RW(boost_monitor_timer_ms);
 
-static ssize_t cap_hs_gear_limit_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct ufs_hba *hba = dev_get_drvdata(dev);
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", !!host->cap_hs_gear_limit);
-}
-
-static ssize_t cap_hs_gear_limit_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct ufs_hba *hba = dev_get_drvdata(dev);
-	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
-	bool value;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	if (kstrtobool(buf, &value))
-		return -EINVAL;
-
-	host->cap_hs_gear_limit = !!value;
-	return count;
-}
-
-static DEVICE_ATTR_RW(cap_hs_gear_limit);
-
 static struct attribute *ufs_qcom_sysfs_attrs[] = {
 	&dev_attr_err_state.attr,
 	&dev_attr_power_mode.attr,
@@ -5974,7 +5920,6 @@ static struct attribute *ufs_qcom_sysfs_attrs[] = {
 	&dev_attr_boost_min_threshold.attr,
 	&dev_attr_boost_max_threshold.attr,
 	&dev_attr_boost_monitor_timer_ms.attr,
-	&dev_attr_cap_hs_gear_limit.attr,
 	NULL
 };
 
@@ -6350,8 +6295,7 @@ static int ufs_qcom_remove(struct platform_device *pdev)
 				&host->ufs_qcom_panic_nb);
 
 	ufshcd_remove(hba);
-	if (host->esi_enabled)
-		platform_msi_domain_free_irqs(hba->dev);
+	platform_msi_domain_free_irqs(hba->dev);
 	return 0;
 }
 
