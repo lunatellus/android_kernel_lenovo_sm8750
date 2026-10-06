@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries..
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -961,8 +961,6 @@ static void uaudio_connect(struct snd_usb_audio *chip)
 {
 	struct xhci_sideband *sb;
 
-	uaudio_dbg("chip: %p card_number:%d\n"
-			, chip, chip->card->number);
 	if (chip->card->number >= SNDRV_CARDS) {
 		uaudio_err("Invalid card number\n");
 		return;
@@ -990,9 +988,6 @@ static void uaudio_disconnect(struct snd_usb_audio *chip)
 	}
 
 	card_num = chip->card->number;
-	uaudio_dbg("chip: %p card: %d\n"
-			, chip, card_num);
-
 	if (card_num >= SNDRV_CARDS) {
 		uaudio_err("invalid card number\n");
 		return;
@@ -1044,9 +1039,9 @@ done:
 	if (dev->sb)
 		xhci_sideband_unregister(dev->sb);
 
+	mutex_unlock(&chip->mutex);
 	uadev[card_num].chip = NULL;
 	uadev[card_num].sb = NULL;
-	mutex_unlock(&chip->mutex);
 }
 
 static void uaudio_dev_release(struct uaudio_dev *dev)
@@ -1444,12 +1439,9 @@ static void handle_uaudio_stream_req(struct qmi_handle *handle,
 		if (!ret)
 			ret = prepare_qmi_response(subs, req_msg, &resp,
 					info_idx);
-		else
-			uaudio_dbg("enable_audio_stream failed %d\n", ret);
-
 		if (ret) {
 			mutex_lock(&chip->mutex);
-			uaudio_dbg("enable process failed %d\n", ret);
+			uaudio_dbg("failed to prepare qmi response %d\n", ret);
 			atomic_dec(&uadev[pcm_card_num].in_use);
 			mutex_unlock(&chip->mutex);
 		}
