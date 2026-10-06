@@ -39,4 +39,14 @@ config HQ_EXTEND_RECLAIM
 	  To compile this driver as a module, choose M here: the module will be
 	  called extend_reclaim.
 
+config HQ_REGISTER_DUMPER
+	tristate "Huaqin regmap register dumper"
+	depends on HQ_KALLSYMS
+	help
+	  Provides procfs nodes to dump registers of regmap-backed devices for
+	  debugging.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called register_dumper.
+
 endmenu

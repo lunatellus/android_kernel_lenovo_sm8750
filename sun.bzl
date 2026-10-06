@@ -115,6 +115,7 @@ def define_sun():
         "drivers/misc/hq/hqsysfs/hqsysfs.ko",
         "drivers/misc/hq/memory/extend_reclaim/extend_reclaim.ko",
         "drivers/misc/hq/memory/ffu/ufsffu.ko",
+        "drivers/misc/hq/register_dumper/register_dumper.ko",
         "drivers/misc/qseecom_proxy.ko",
         "drivers/mmc/host/cqhci.ko",
         "drivers/mmc/host/sdhci-msm.ko",

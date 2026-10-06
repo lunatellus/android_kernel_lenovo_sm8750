@@ -48,6 +48,7 @@ spmi-pmic-arb.ko
 regmap-spmi.ko
 qti-regmap-debugfs.ko
 hq_kallsyms.ko
+register_dumper.ko
 qcom-spmi-pmic.ko
 nvmem_qcom-spmi-sdam.ko
 rtc-pm8xxx.ko
