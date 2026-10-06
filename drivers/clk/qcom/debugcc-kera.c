@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "clk: %s: " fmt, __func__
@@ -505,6 +505,8 @@ static const char *const gcc_debug_mux_parent_names[] = {
 	"gcc_qupv3_wrap1_s7_clk",
 	"gcc_qupv3_wrap2_core_2x_clk",
 	"gcc_qupv3_wrap2_core_clk",
+	"gcc_qupv3_wrap2_ibi_ctrl_2_clk",
+	"gcc_qupv3_wrap2_ibi_ctrl_3_clk",
 	"gcc_qupv3_wrap2_s0_clk",
 	"gcc_qupv3_wrap2_s1_clk",
 	"gcc_qupv3_wrap2_s2_clk",
@@ -515,6 +517,8 @@ static const char *const gcc_debug_mux_parent_names[] = {
 	"gcc_qupv3_wrap2_s7_clk",
 	"gcc_qupv3_wrap_1_m_ahb_clk",
 	"gcc_qupv3_wrap_1_s_ahb_clk",
+	"gcc_qupv3_wrap_2_ibi_2_ahb_clk",
+	"gcc_qupv3_wrap_2_ibi_3_ahb_clk",
 	"gcc_qupv3_wrap_2_m_ahb_clk",
 	"gcc_qupv3_wrap_2_s_ahb_clk",
 	"gcc_sdcc1_ahb_clk",
@@ -551,7 +555,6 @@ static const char *const gcc_debug_mux_parent_names[] = {
 	"measure_only_gcc_pcie_rscc_xo_clk",
 	"measure_only_gcc_video_ahb_clk",
 	"measure_only_gcc_video_xo_clk",
-	"measure_only_gemnoc_clk",
 	"measure_only_ipa_2x_clk",
 	"measure_only_pcie_0_pipe_clk",
 	"measure_only_pcie_1_pipe_clk",
@@ -625,6 +628,8 @@ static int gcc_debug_mux_sels[] = {
 	0xDF,		/* gcc_qupv3_wrap1_s7_clk */
 	0xE4,		/* gcc_qupv3_wrap2_core_2x_clk */
 	0xE3,		/* gcc_qupv3_wrap2_core_clk */
+	0xEF,		/* gcc_qupv3_wrap2_ibi_ctrl_2_clk */
+	0xF0,		/* gcc_qupv3_wrap2_ibi_ctrl_3_clk */
 	0xE5,		/* gcc_qupv3_wrap2_s0_clk */
 	0xE6,		/* gcc_qupv3_wrap2_s1_clk */
 	0xE7,		/* gcc_qupv3_wrap2_s2_clk */
@@ -635,6 +640,8 @@ static int gcc_debug_mux_sels[] = {
 	0xEC,		/* gcc_qupv3_wrap2_s7_clk */
 	0xD4,		/* gcc_qupv3_wrap_1_m_ahb_clk */
 	0xD5,		/* gcc_qupv3_wrap_1_s_ahb_clk */
+	0xED,		/* gcc_qupv3_wrap_2_ibi_2_ahb_clk */
+	0xEE,		/* gcc_qupv3_wrap_2_ibi_3_ahb_clk */
 	0xE1,		/* gcc_qupv3_wrap_2_m_ahb_clk */
 	0xE2,		/* gcc_qupv3_wrap_2_s_ahb_clk */
 	0x1EE,		/* gcc_sdcc1_ahb_clk */
@@ -671,7 +678,6 @@ static int gcc_debug_mux_sels[] = {
 	0x1C6,		/* measure_only_gcc_pcie_rscc_xo_clk */
 	0x8F,		/* measure_only_gcc_video_ahb_clk */
 	0x96,		/* measure_only_gcc_video_xo_clk */
-	0x124,		/* measure_only_gemnoc_clk */
 	0x198,		/* measure_only_ipa_2x_clk */
 	0x179,		/* measure_only_pcie_0_pipe_clk */
 	0x1F6,		/* measure_only_pcie_1_pipe_clk */
@@ -1052,14 +1058,6 @@ static struct clk_dummy measure_only_gcc_video_xo_clk = {
 	},
 };
 
-static struct clk_dummy measure_only_gemnoc_clk = {
-	.rrate = 1000,
-	.hw.init = &(const struct clk_init_data){
-		.name = "measure_only_gemnoc_clk",
-		.ops = &clk_dummy_ops,
-	},
-};
-
 static struct clk_dummy measure_only_gpu_cc_acd_ahb_clk = {
 	.rrate = 1000,
 	.hw.init = &(const struct clk_init_data){
@@ -1248,7 +1246,6 @@ static struct clk_hw *debugcc_kera_hws[] = {
 	&measure_only_gcc_pcie_rscc_xo_clk.hw,
 	&measure_only_gcc_video_ahb_clk.hw,
 	&measure_only_gcc_video_xo_clk.hw,
-	&measure_only_gemnoc_clk.hw,
 	&measure_only_gpu_cc_acd_ahb_clk.hw,
 	&measure_only_gpu_cc_cx_gfx3d_clk.hw,
 	&measure_only_gpu_cc_cx_gfx3d_slv_clk.hw,
