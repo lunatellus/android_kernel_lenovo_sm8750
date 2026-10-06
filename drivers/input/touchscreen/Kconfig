@@ -1399,4 +1399,14 @@ config TOUCHSCREEN_HIMAX_HX83112B
 	  To compile this driver as a module, choose M here: the
 	  module will be called himax_hx83112b.
 
+config TOUCHSCREEN_NVT_SPI
+	tristate "Novatek NT36xxx SPI touchscreen"
+	depends on SPI && HQ_SYSFS && QCOM_PANEL_EVENT_NOTIFIER
+	help
+	  Say Y here to enable support for the Novatek NT36xxx SPI
+	  touchscreen controller used on the Lenovo elden board.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called nvt_36xxx.
+
 endif
