@@ -1041,6 +1041,14 @@ config QCOM_FSA4480_I2C
 	  for accessing the device, switching between USB and Audio
 	  modes, changing orientation.
 
+config QCOM_FSA4480_SUB_I2C
+	tristate "Secondary Fairchild FSA4480 chip with I2C"
+	depends on QCOM_FSA4480_I2C && UCSI_QTI_GLINK
+	select REGMAP_I2C
+	help
+	  Support for the second FSA4480 USB/audio switch on the Lenovo
+	  elden board, controlled using I2C.
+
 source "drivers/soc/qcom/mem_buf/Kconfig"
 source "drivers/soc/qcom/tmecom/Kconfig"
 
