@@ -89,23 +89,17 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
 	return;
 }
 
-static int __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
 {
 	CS_UNLOCK(drvdata->base);
 
 	/* Check if the etf already disabled*/
 	if (!(readl_relaxed(drvdata->base + TMC_CTL) & TMC_CTL_CAPT_EN)) {
 		CS_LOCK(drvdata->base);
-		return 0;
+		return;
 	}
 
 	tmc_flush_and_stop(drvdata);
-	if (tmc_wait_for_tmcready(drvdata)) {
-		dev_err(&drvdata->csdev->dev,
-			"Failed to disable: TMC is not ready\n");
-		CS_LOCK(drvdata->base);
-		return -EBUSY;
-	}
 	tmc_disable_stop_on_flush(drvdata);
 	/*
 	 * When operating in sysFS mode the content of the buffer needs to be
@@ -116,7 +110,6 @@ static int __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
 	tmc_disable_hw(drvdata);
 
 	CS_LOCK(drvdata->base);
-	return 0;
 }
 
 static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
@@ -703,9 +696,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
 			ret = -EINVAL;
 			goto out;
 		}
-		ret = __tmc_etb_disable_hw(drvdata);
-		if (ret)
-			goto out;
+		__tmc_etb_disable_hw(drvdata);
 	}
 
 	drvdata->reading = true;
