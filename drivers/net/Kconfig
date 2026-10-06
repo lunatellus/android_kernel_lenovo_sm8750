@@ -29,6 +29,9 @@ if NETDEVICES
 config MII
 	tristate
 
+config HQ_MII
+	tristate
+
 config NET_CORE
 	default y
 	bool "Network core driver support"
