@@ -255,6 +255,7 @@ def define_sun():
         "drivers/spmi/spmi-pmic-arb.ko",
         "drivers/spmi/spmi-pmic-arb-debug.ko",
         "drivers/thermal/lenovo/lenovo_sys_temp.ko",
+        "drivers/thermal/lenovo/lenovo_thermal_control.ko",
         "drivers/thermal/qcom/bcl_pmic5.ko",
         "drivers/thermal/qcom/bcl_soc.ko",
         "drivers/thermal/qcom/cpu_hotplug.ko",
