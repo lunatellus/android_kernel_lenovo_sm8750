@@ -153,13 +153,6 @@ static const struct eusb_phy_tbl m31_eusb_phy_tbl[] = {
 };
 
 static const struct eusb_phy_tbl m31_eusb_phy_override_tbl[] = {
-	/*
-	 * Set XCFGI[159] to enable SE0 timeout mechanism in M31.
-	 * This enables a counter which will assume bus inactive if
-	 * SE0 is more then 2.5 us and reset the state machine to default
-	 * state.
-	 */
-	EUSB_PHY_INIT_CFG(USB_PHY_XCFGI_159_152, BIT(7), 1),
 	EUSB_PHY_INIT_CFG(USB_PHY_XCFGI_39_32, GENMASK(3, 2), 0),
 	EUSB_PHY_INIT_CFG(USB_PHY_XCFGI_71_64, GENMASK(3, 0), 7),
 	EUSB_PHY_INIT_CFG(USB_PHY_XCFGI_31_24, GENMASK(2, 0), 0),
