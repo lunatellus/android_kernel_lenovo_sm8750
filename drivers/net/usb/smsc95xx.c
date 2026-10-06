@@ -25,6 +25,18 @@
 #include <net/selftests.h>
 
 #include "smsc95xx.h"
+#include "hq_usbnet.h"
+
+extern unsigned long __nocfi hq_kallsyms_lookup_name(const char *name);
+
+int (*hq_platform_get_ethdev_address)(struct device *dev,
+				      struct net_device *netdev);
+struct fwnode_handle *(*hq_irq_domain_alloc_fwnode)(unsigned int type, int id,
+						     const char *name, phys_addr_t *pa);
+struct irq_chip *hq_dummy_irq_chip;
+void (*hq_irq_domain_free_fwnode)(struct fwnode_handle *fwnode);
+void (*hq_phy_get_pause)(struct phy_device *phydev, bool *tx_pause,
+			 bool *rx_pause);
 
 #define SMSC_CHIPNAME			"smsc95xx"
 #define SMSC_DRIVER_VERSION		"2.0.0"
@@ -88,9 +100,9 @@ static int __must_check smsc95xx_read_reg(struct usbnet *dev, u32 index,
 	int (*fn)(struct usbnet *, u8, u8, u16, u16, void *, u16);
 
 	if (current != pdata->pm_task)
-		fn = usbnet_read_cmd;
+		fn = hq_usbnet_read_cmd;
 	else
-		fn = usbnet_read_cmd_nopm;
+		fn = hq_usbnet_read_cmd_nopm;
 
 	ret = fn(dev, USB_VENDOR_REQUEST_READ_REGISTER, USB_DIR_IN
 		 | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
@@ -119,9 +131,9 @@ static int __must_check smsc95xx_write_reg(struct usbnet *dev, u32 index,
 	int (*fn)(struct usbnet *, u8, u8, u16, u16, const void *, u16);
 
 	if (current != pdata->pm_task)
-		fn = usbnet_write_cmd;
+		fn = hq_usbnet_write_cmd;
 	else
-		fn = usbnet_write_cmd_nopm;
+		fn = hq_usbnet_write_cmd_nopm;
 
 	buf = data;
 	cpu_to_le32s(&buf);
@@ -458,7 +470,7 @@ static int __must_check smsc95xx_write_reg_async(struct usbnet *dev, u16 index,
 	buf = data;
 	cpu_to_le32s(&buf);
 
-	ret = usbnet_write_cmd_async(dev, USB_VENDOR_REQUEST_WRITE_REGISTER,
+	ret = hq_usbnet_write_cmd_async(dev, USB_VENDOR_REQUEST_WRITE_REGISTER,
 				     USB_DIR_OUT | USB_TYPE_VENDOR |
 				     USB_RECIP_DEVICE,
 				     0, index, &buf, size);
@@ -540,13 +552,23 @@ static int smsc95xx_phy_update_flowcontrol(struct usbnet *dev)
 	u32 flow = 0, afc_cfg;
 	struct smsc95xx_priv *pdata = dev->driver_priv;
 	bool tx_pause, rx_pause;
+	static unsigned long var;
 
 	int ret = smsc95xx_read_reg(dev, AFC_CFG, &afc_cfg);
 	if (ret < 0)
 		return ret;
 
+	if (!var) {
+		var = hq_kallsyms_lookup_name("phy_get_pause");
+		if (unlikely(!var))
+			return 0;
+		hq_phy_get_pause = (void *)var;
+	}
+	if (IS_ERR(hq_phy_get_pause) || !hq_phy_get_pause)
+		return 0;
+
 	if (pdata->phydev->duplex == DUPLEX_FULL) {
-		phy_get_pause(pdata->phydev, &tx_pause, &rx_pause);
+		hq_phy_get_pause(pdata->phydev, &tx_pause, &rx_pause);
 
 		if (rx_pause)
 			flow = 0xFFFF0002;
@@ -775,9 +797,9 @@ static int smsc95xx_ethtool_get_sset_count(struct net_device *ndev, int sset)
 static const struct ethtool_ops smsc95xx_ethtool_ops = {
 	.get_link	= smsc95xx_get_link,
 	.nway_reset	= phy_ethtool_nway_reset,
-	.get_drvinfo	= usbnet_get_drvinfo,
-	.get_msglevel	= usbnet_get_msglevel,
-	.set_msglevel	= usbnet_set_msglevel,
+	.get_drvinfo	= hq_usbnet_get_drvinfo,
+	.get_msglevel	= hq_usbnet_get_msglevel,
+	.set_msglevel	= hq_usbnet_set_msglevel,
 	.get_eeprom_len	= smsc95xx_ethtool_get_eeprom_len,
 	.get_eeprom	= smsc95xx_ethtool_get_eeprom,
 	.set_eeprom	= smsc95xx_ethtool_set_eeprom,
@@ -804,9 +826,20 @@ static int smsc95xx_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 static void smsc95xx_init_mac_address(struct usbnet *dev)
 {
 	u8 addr[ETH_ALEN];
+	static unsigned long var;
+
+	if (!var) {
+		var = hq_kallsyms_lookup_name("platform_get_ethdev_address");
+		if (unlikely(!var))
+			return;
+		hq_platform_get_ethdev_address = (void *)var;
+	}
+	if (IS_ERR(hq_platform_get_ethdev_address) ||
+	    !hq_platform_get_ethdev_address)
+		return;
 
 	/* maybe the boot loader passed the MAC address in devicetree */
-	if (!platform_get_ethdev_address(&dev->udev->dev, dev->net)) {
+	if (!hq_platform_get_ethdev_address(&dev->udev->dev, dev->net)) {
 		if (is_valid_ether_addr(dev->net->dev_addr)) {
 			/* device tree values are valid so use them */
 			netif_dbg(dev, ifup, dev->net, "MAC address read from the device tree\n");
@@ -1070,11 +1103,11 @@ static int smsc95xx_reset(struct usbnet *dev)
 }
 
 static const struct net_device_ops smsc95xx_netdev_ops = {
-	.ndo_open		= usbnet_open,
-	.ndo_stop		= usbnet_stop,
-	.ndo_start_xmit		= usbnet_start_xmit,
-	.ndo_tx_timeout		= usbnet_tx_timeout,
-	.ndo_change_mtu		= usbnet_change_mtu,
+	.ndo_open		= hq_usbnet_open,
+	.ndo_stop		= hq_usbnet_stop,
+	.ndo_start_xmit		= hq_usbnet_start_xmit,
+	.ndo_tx_timeout		= hq_usbnet_tx_timeout,
+	.ndo_change_mtu		= hq_usbnet_change_mtu,
 	.ndo_get_stats64	= dev_get_tstats64,
 	.ndo_set_mac_address 	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -1089,7 +1122,7 @@ static void smsc95xx_handle_link_change(struct net_device *net)
 
 	phy_print_status(net->phydev);
 	smsc95xx_mac_update_fullduplex(dev);
-	usbnet_defer_kevent(dev, EVENT_LINK_CHANGE);
+	hq_usbnet_defer_kevent(dev, EVENT_LINK_CHANGE);
 }
 
 static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
@@ -1098,12 +1131,15 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	char usb_path[64];
 	int ret, phy_irq;
 	u32 val;
+	static unsigned long var1;
+	static unsigned long val2;
+	static unsigned long val3;
 
 	printk(KERN_INFO SMSC_CHIPNAME " v" SMSC_DRIVER_VERSION "\n");
 
-	ret = usbnet_get_endpoints(dev, intf);
+	ret = hq_usbnet_get_endpoints(dev, intf);
 	if (ret < 0) {
-		netdev_warn(dev->net, "usbnet_get_endpoints failed: %d\n", ret);
+		netdev_warn(dev->net, "hq_usbnet_get_endpoints failed: %d\n", ret);
 		return ret;
 	}
 
@@ -1137,9 +1173,28 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (ret)
 		goto free_pdata;
 
+	if (!var1) {
+		var1 = hq_kallsyms_lookup_name("__irq_domain_alloc_fwnode");
+		if (unlikely(!var1))
+			return 0;
+		hq_irq_domain_alloc_fwnode = (void *)var1;
+	}
+	if (IS_ERR(hq_irq_domain_alloc_fwnode) || !hq_irq_domain_alloc_fwnode)
+		return -ENOMEM;
+
+	if (!val3) {
+		val3 = hq_kallsyms_lookup_name("irq_domain_free_fwnode");
+		if (unlikely(!val3))
+			return 0;
+		hq_irq_domain_free_fwnode = (void *)val3;
+	}
+	if (IS_ERR(hq_irq_domain_free_fwnode) || !hq_irq_domain_free_fwnode)
+		return -ENOMEM;
+
 	/* create irq domain for use by PHY driver and GPIO consumers */
 	usb_make_path(dev->udev, usb_path, sizeof(usb_path));
-	pdata->irqfwnode = irq_domain_alloc_named_fwnode(usb_path);
+	pdata->irqfwnode = hq_irq_domain_alloc_fwnode(IRQCHIP_FWNODE_NAMED, 0,
+						      usb_path, NULL);
 	if (!pdata->irqfwnode) {
 		ret = -ENOMEM;
 		goto free_pdata;
@@ -1160,7 +1215,16 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 		goto remove_irqdomain;
 	}
 
-	pdata->irqchip = dummy_irq_chip;
+	if (!val2) {
+		val2 = hq_kallsyms_lookup_name("dummy_irq_chip");
+		if (unlikely(!val2))
+			return 0;
+		hq_dummy_irq_chip = (void *)val2;
+	}
+	if (IS_ERR(hq_dummy_irq_chip) || !hq_dummy_irq_chip)
+		return -ENOMEM;
+
+	pdata->irqchip = *hq_dummy_irq_chip;
 	pdata->irqchip.name = SMSC_CHIPNAME;
 	irq_set_chip_and_handler_name(phy_irq, &pdata->irqchip,
 				      handle_simple_irq, "phy");
@@ -1252,7 +1316,7 @@ remove_irqdomain:
 	irq_domain_remove(pdata->irqdomain);
 
 free_irqfwnode:
-	irq_domain_free_fwnode(pdata->irqfwnode);
+	hq_irq_domain_free_fwnode(pdata->irqfwnode);
 
 free_pdata:
 	kfree(pdata);
@@ -1262,13 +1326,23 @@ free_pdata:
 static void smsc95xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct smsc95xx_priv *pdata = dev->driver_priv;
+	static unsigned long var1;
+
+	if (!var1) {
+		var1 = hq_kallsyms_lookup_name("irq_domain_free_fwnode");
+		if (unlikely(!var1))
+			return;
+		hq_irq_domain_free_fwnode = (void *)var1;
+	}
+	if (IS_ERR(hq_irq_domain_free_fwnode) || !hq_irq_domain_free_fwnode)
+		return;
 
 	phy_disconnect(dev->net->phydev);
 	mdiobus_unregister(pdata->mdiobus);
 	mdiobus_free(pdata->mdiobus);
 	irq_dispose_mapping(irq_find_mapping(pdata->irqdomain, PHY_HWIRQ));
 	irq_domain_remove(pdata->irqdomain);
-	irq_domain_free_fwnode(pdata->irqfwnode);
+	hq_irq_domain_free_fwnode(pdata->irqfwnode);
 	netif_dbg(dev, ifdown, dev->net, "free pdata\n");
 	kfree(pdata);
 }
@@ -1495,9 +1569,9 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 
 	pdata->pm_task = current;
 
-	ret = usbnet_suspend(intf, message);
+	ret = hq_usbnet_suspend(intf, message);
 	if (ret < 0) {
-		netdev_warn(dev->net, "usbnet_suspend error\n");
+		netdev_warn(dev->net, "hq_usbnet_suspend error\n");
 		pdata->pm_task = NULL;
 		return ret;
 	}
@@ -1735,7 +1809,7 @@ done:
 	 * in system sleep
 	 */
 	if (ret && PMSG_IS_AUTO(message))
-		usbnet_resume(intf);
+		hq_usbnet_resume(intf);
 
 	pdata->pm_task = NULL;
 	return ret;
@@ -1787,9 +1861,9 @@ static int smsc95xx_resume(struct usb_interface *intf)
 
 	phy_init_hw(pdata->phydev);
 
-	ret = usbnet_resume(intf);
+	ret = hq_usbnet_resume(intf);
 	if (ret < 0)
-		netdev_warn(dev->net, "usbnet_resume error\n");
+		netdev_warn(dev->net, "hq_usbnet_resume error\n");
 
 done:
 	pdata->pm_task = NULL;
@@ -1892,7 +1966,7 @@ static int smsc95xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 				smsc95xx_rx_csum_offload(ax_skb);
 			skb_trim(ax_skb, ax_skb->len - 4); /* remove fcs */
 
-			usbnet_skb_return(dev, ax_skb);
+			hq_usbnet_skb_return(dev, ax_skb);
 		}
 
 		skb_pull(skb, size);
@@ -2123,11 +2197,11 @@ MODULE_DEVICE_TABLE(usb, products);
 static struct usb_driver smsc95xx_driver = {
 	.name		= "smsc95xx",
 	.id_table	= products,
-	.probe		= usbnet_probe,
+	.probe		= hq_usbnet_probe,
 	.suspend	= smsc95xx_suspend,
 	.resume		= smsc95xx_resume,
 	.reset_resume	= smsc95xx_reset_resume,
-	.disconnect	= usbnet_disconnect,
+	.disconnect	= hq_usbnet_disconnect,
 	.disable_hub_initiated_lpm = 1,
 	.supports_autosuspend = 1,
 };
