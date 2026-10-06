@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+menu "Lenovo thermal drivers"
+
+config LENOVO_SYS_TEMP
+	tristate "Lenovo virtual thermal zones"
+	depends on THERMAL_OF && HQ_SYSFS
+	help
+	  Registers virtual thermal zones whose temperatures are computed from
+	  other thermal zones by a fixed model described in the device tree
+	  ("lenovo,sys-temp").
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called lenovo_sys_temp.
+
+endmenu
