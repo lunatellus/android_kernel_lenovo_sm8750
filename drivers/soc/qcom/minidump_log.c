@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/cache.h>
@@ -153,7 +153,7 @@ module_param_array(key_modules, charp, &n_modump, 0644);
 static bool stack_dump;
 module_param(stack_dump, bool, 0644);
 
-#define FREQ_LOG_IDX_MASK	0xF
+#define FREQ_LOG_MAX	10
 
 static int register_stack_entry(struct md_region *ksp_entry, u64 sp, u64 size)
 {
@@ -917,7 +917,7 @@ static void md_dump_runqueues(void)
 		seq_buf_printf(md_runq_seq_buf, "%16lld", t->sched_info.last_queued);
 		seq_buf_printf(md_runq_seq_buf, "%16lld", t->sched_info.run_delay);
 		seq_buf_printf(md_runq_seq_buf, "%12ld", t->sched_info.pcount);
-		seq_buf_printf(md_runq_seq_buf, "%4d", t->thread_info.cpu);
+		seq_buf_printf(md_runq_seq_buf, "%4d", t->on_cpu);
 		seq_buf_printf(md_runq_seq_buf, "%5d", t->prio);
 		seq_buf_printf(md_runq_seq_buf, "%*s", 6, md_get_task_state(t));
 #if IS_ENABLED(CONFIG_SCHED_WALT)
@@ -1353,8 +1353,8 @@ struct freq_log {
 };
 
 struct freq_hist {
-	atomic_t idx;
-	struct freq_log log[FREQ_LOG_IDX_MASK + 1];
+	uint32_t idx;
+	struct freq_log log[FREQ_LOG_MAX];
 };
 
 #ifdef CONFIG_QCOM_MINIDUMP_PANIC_CPUFREQ_INFO
@@ -1371,9 +1371,10 @@ static void log_cpu_freq(void *unused,
 
 	if (cluster > max_cluster)
 		return;
-	index = atomic_fetch_inc(&cpuclk_log[cluster].idx) & FREQ_LOG_IDX_MASK;
+	index = cpuclk_log[cluster].idx;
 	cpuclk_log[cluster].log[index].ktime = sched_clock();
 	cpuclk_log[cluster].log[index].freq = *target_freq;
+	cpuclk_log[cluster].idx = (index + 1) % FREQ_LOG_MAX;
 }
 
 static void register_cpufreq_log(void)
