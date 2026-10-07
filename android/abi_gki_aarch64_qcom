@@ -56,6 +56,7 @@
   __bitmap_clear
   bitmap_find_next_zero_area_off
   bitmap_free
+  __bitmap_intersects
   __bitmap_or
   bitmap_parselist
   bitmap_print_to_pagebuf
@@ -734,6 +735,8 @@
   geni_se_tx_dma_unprep
   genlmsg_multicast_allns
   genlmsg_put
+  genphy_c45_pma_resume
+  genphy_c45_pma_suspend
   genl_register_family
   genl_unregister_family
   gen_pool_add_owner
@@ -758,6 +761,7 @@
   get_net_ns_by_pid
   get_option
   get_page_owner_handle
+  get_phy_device
   get_pid_task
   get_random_bytes
   get_random_u16
@@ -835,6 +839,7 @@
   hvc_remove
   __hw_addr_init
   __hw_addr_sync
+  __hw_addr_sync_dev
   __hw_addr_unsync
   hwspin_lock_bust
   hwspin_lock_free
@@ -1141,6 +1146,7 @@
   mbox_free_channel
   mbox_request_channel
   mbox_send_message
+  mdiobus_c45_modify
   media_device_cleanup
   media_device_init
   __media_device_register
@@ -1187,10 +1193,10 @@
   mmc_cqe_request_done
   mmc_execute_tuning
   mmc_hs200_tuning
-  mmc_issue_type
-  mmc_of_parse
   __mmc_poll_for_busy
   mmc_prepare_busy_cmd
+  mmc_issue_type
+  mmc_of_parse
   mmc_regulator_get_supply
   mmc_regulator_set_ocr
   mmc_regulator_set_vqmmc
@@ -1237,6 +1243,7 @@
   __netdev_alloc_frag_align
   __netdev_alloc_skb
   netdev_err
+  netdev_features_change
   netdev_info
   netdev_set_default_ethtool_ops
   netif_carrier_off
@@ -1310,6 +1317,7 @@
   __of_get_address
   of_get_child_by_name
   of_get_cpu_node
+  of_get_mac_address_nvmem
   of_get_named_gpio
   of_get_next_available_child
   of_get_next_child
@@ -1421,6 +1429,9 @@
   pci_write_config_dword
   pcpu_nr_pages
   __per_cpu_offset
+  __phy_modify_mmd
+  __phy_read_mmd
+  __phy_write_mmd
   per_cpu_ptr_to_phys
   perf_aux_output_begin
   perf_aux_output_end
@@ -1437,10 +1448,17 @@
   perf_trace_buf_alloc
   perf_trace_run_bpf_submit
   phy_calibrate
+  phy_check_valid
+  phy_device_free
+  phy_device_register
   phy_exit
   phy_init
+  phy_lookup_setting
+  phy_mac_interrupt
   phy_power_off
   phy_power_on
+  phy_resolve_aneg_linkmode
+  phy_restart_aneg
   phy_set_mode_ext
   pick_highest_pushable_task
   pick_migrate_task
@@ -2144,6 +2162,7 @@
   __traceiter_android_vh_update_topology_flags_workfn
   __traceiter_android_vh_zs_shrinker_adjust
   __traceiter_android_vh_zs_shrinker_bypass
+  __traceiter_android_vh_f2fs_ioc_set_pin_file
   __traceiter_cpu_frequency_limits
   __traceiter_ipi_entry
   __traceiter_ipi_raise
@@ -2257,6 +2276,7 @@
   __tracepoint_android_vh_update_topology_flags_workfn
   __tracepoint_android_vh_zs_shrinker_adjust
   __tracepoint_android_vh_zs_shrinker_bypass
+  __tracepoint_android_vh_f2fs_ioc_set_pin_file
   __tracepoint_cpu_frequency_limits
   __tracepoint_ipi_entry
   __tracepoint_ipi_raise
