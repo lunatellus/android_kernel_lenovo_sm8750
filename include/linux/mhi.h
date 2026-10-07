@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  */
 #ifndef _MHI_H_
@@ -299,8 +298,6 @@ struct mhi_event_config {
  * @event_cfg: Array of defined event rings
  * @use_bounce_buf: Use a bounce buffer pool due to limited DDR access
  * @m2_no_db: Host is not allowed to ring DB in M2 state
- * @bhie_offset: Offset (in bytes) of the boot host interface extended
- *		register from the MMIO base register
  */
 struct mhi_controller_config {
 	u32 max_channels;
@@ -312,7 +309,6 @@ struct mhi_controller_config {
 	struct mhi_event_config *event_cfg;
 	bool use_bounce_buf;
 	bool m2_no_db;
-	u32 bhie_offset;
 };
 
 /**
@@ -380,11 +376,7 @@ struct mhi_controller_config {
  * @wake_put: CB function to de-assert device wake (optional)
  * @wake_toggle: CB function to assert and de-assert device wake (optional)
  * @runtime_get: CB function to controller runtime resume (required)
- * @runtime_get_sync: CB function to controller sychronous runtime resume
- *                    (optional)
  * @runtime_put: CB function to decrement pm usage (required)
- * @runtime_put_autosuspend: CB function to decrement pm usage and autosuspend
- *                           (optional)
  * @runtime_last_busy: CB function for controller to mark last busy (optional)
  * @map_single: CB function to create TRE buffer
  * @unmap_single: CB function to destroy TRE buffer
@@ -479,9 +471,7 @@ struct mhi_controller {
 	void (*wake_put)(struct mhi_controller *mhi_cntrl, bool override);
 	void (*wake_toggle)(struct mhi_controller *mhi_cntrl);
 	int (*runtime_get)(struct mhi_controller *mhi_cntrl);
-	int (*runtime_get_sync)(struct mhi_controller *mhi_cntrl);
 	void (*runtime_put)(struct mhi_controller *mhi_cntrl);
-	int (*runtime_put_autosuspend)(struct mhi_controller *mhi_cntrl);
 	void (*runtime_last_busy)(struct mhi_controller *mhi_cntrl);
 	int (*map_single)(struct mhi_controller *mhi_cntrl,
 			  struct mhi_buf_info *buf);
