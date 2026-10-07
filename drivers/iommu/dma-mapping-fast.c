@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping.h>
@@ -309,12 +309,8 @@ static void fast_smmu_unmap_page(struct device *dev, dma_addr_t iova,
 	}
 
 	spin_lock_irqsave(&mapping->lock, flags);
-
-	if (unlikely(!av8l_fast_unmap_public(mapping->pgtbl_ops, iova, len)))
-		goto fail;
-
+	av8l_fast_unmap_public(mapping->pgtbl_ops, iova, len);
 	__fast_smmu_free_iova(mapping, iova, len);
-fail:
 	spin_unlock_irqrestore(&mapping->lock, flags);
 }
 
@@ -450,8 +446,7 @@ static void fast_smmu_unmap_sg(struct device *dev,
 	len = ALIGN(sg_dma_address(sg) + sg_dma_len(sg) - (start - offset),
 		    FAST_PAGE_SIZE);
 
-	if (unlikely(!av8l_fast_unmap_public(mapping->pgtbl_ops, start, len)))
-		return;
+	av8l_fast_unmap_public(mapping->pgtbl_ops, start, len);
 
 	spin_lock_irqsave(&mapping->lock, flags);
 	__fast_smmu_free_iova(mapping, start, len);
@@ -717,10 +712,7 @@ static void fast_smmu_free(struct device *dev, size_t size,
 	size = ALIGN(size, FAST_PAGE_SIZE);
 
 	spin_lock_irqsave(&mapping->lock, flags);
-
-	if (unlikely(!av8l_fast_unmap_public(mapping->pgtbl_ops, dma_handle, size)))
-		goto fail;
-
+	av8l_fast_unmap_public(mapping->pgtbl_ops, dma_handle, size);
 	__fast_smmu_free_iova(mapping, dma_handle, size);
 	spin_unlock_irqrestore(&mapping->lock, flags);
 
@@ -741,11 +733,6 @@ static void fast_smmu_free(struct device *dev, size_t size,
 
 	if (page)
 		qcom_dma_free_contiguous(dev, page, size);
-
-	return;
-
-fail:
-	spin_unlock_irqrestore(&mapping->lock, flags);
 }
 
 static int fast_smmu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,

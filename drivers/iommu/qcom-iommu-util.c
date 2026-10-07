@@ -806,8 +806,6 @@ static void iova_insert_rbtree(struct rb_root *root, struct iova *iova,
 	rb_insert_color(&iova->node, root);
 }
 
-#define MAX_ALIGN_PAGE_SHIFT 12
-
 static unsigned long limit_align_shift(struct iova_domain *iovad,
 				       unsigned long shift)
 {
@@ -820,7 +818,7 @@ static unsigned long limit_align_shift(struct iova_domain *iovad,
 	if (!new_shift)
 		return shift;
 
-	max_align_shift = new_shift + MAX_ALIGN_PAGE_SHIFT - iova_shift(iovad);
+	max_align_shift = new_shift + PAGE_SHIFT - iova_shift(iovad);
 
 	return min_t(unsigned long, max_align_shift, shift);
 }
