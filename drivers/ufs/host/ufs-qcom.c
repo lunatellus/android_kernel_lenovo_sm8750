@@ -2490,7 +2490,7 @@ static int ufs_qcom_apply_dev_quirks(struct ufs_hba *hba)
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_WDC)
 		hba->dev_quirks |= UFS_DEVICE_QUIRK_HOST_PA_TACTIVATE;
 
-	if (hba->dev_quirks & UFS_DEVICE_QUIRK_PA_HIBER8TIME)
+	if (hba->dev_quirks & UFS_QCOM_DEVICE_QUIRK_PA_HIBER8TIME)
 		ufs_qcom_override_pa_h8time(hba);
 
 	if (hba->dev_quirks & UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH)
@@ -5248,7 +5248,7 @@ static void ufs_qcom_config_scaling_param(struct ufs_hba *hba,
 static struct ufs_dev_quirk ufs_qcom_dev_fixups[] = {
 	{ .wmanufacturerid = UFS_VENDOR_SAMSUNG,
 	  .model = UFS_ANY_MODEL,
-	  .quirk = UFS_DEVICE_QUIRK_PA_HIBER8TIME |
+	  .quirk = UFS_QCOM_DEVICE_QUIRK_PA_HIBER8TIME |
 			UFS_DEVICE_QUIRK_PA_TX_HSG1_SYNC_LENGTH |
 			UFS_DEVICE_QUIRK_PA_TX_DEEMPHASIS_TUNING },
 	{ .wmanufacturerid = UFS_VENDOR_MICRON,

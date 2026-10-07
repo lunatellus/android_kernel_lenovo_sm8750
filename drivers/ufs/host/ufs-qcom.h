@@ -246,9 +246,11 @@ enum ufs_qcom_phy_init_type {
 /* Device Quirks */
 /*
  * Some ufs devices may need more time to be in hibern8 before exiting.
- * Enable this quirk to give it an additional 100us.
+ * Enable this quirk to give it an additional 100us. The UFS core has its own
+ * UFS_DEVICE_QUIRK_PA_HIBER8TIME (bit 12) for its fixup table; this one only
+ * covers the devices listed in the ufs-qcom fixup table.
  */
-#define UFS_DEVICE_QUIRK_PA_HIBER8TIME          (1 << 15)
+#define UFS_QCOM_DEVICE_QUIRK_PA_HIBER8TIME     (1 << 15)
 
 /*
  * Some ufs device vendors need a different TSync length.
