@@ -15,8 +15,10 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
+#include <linux/power_supply.h>
 #include <linux/reboot.h>
 #include <linux/regmap.h>
+#include <linux/workqueue.h>
 
 #define PON_REV2			0x01
 
@@ -81,6 +83,10 @@ struct pm8941_pwrkey {
 	ktime_t sw_debounce_end_time;
 	bool last_status;
 	const struct pm8941_data *data;
+	struct delayed_work timeout_work;
+	bool forced_shutdown;
+	struct power_supply *usb_psy;
+	bool forced_shutdown_sts;
 };
 
 static int pm8941_reboot_notify(struct notifier_block *nb,
@@ -145,10 +151,36 @@ static int pm8941_reboot_notify(struct notifier_block *nb,
 	return NOTIFY_DONE;
 }
 
+static void pmic_pwrkey_timeout_handler(struct work_struct *work)
+{
+	struct pm8941_pwrkey *pwrkey = container_of(work, struct pm8941_pwrkey,
+						    timeout_work.work);
+	union power_supply_propval val = { .intval = 1 };
+
+	if (IS_ERR(pwrkey->usb_psy) || !pwrkey->usb_psy) {
+		pwrkey->usb_psy = power_supply_get_by_name("usb");
+		if (IS_ERR(pwrkey->usb_psy) || !pwrkey->usb_psy) {
+			pr_info("%s, usb_psy not ready!!!\n", __func__);
+			return;
+		}
+	}
+
+	dev_err(pwrkey->dev, "%s forced_shutdown_sts:%d, sts:%d\n",
+		pwrkey->input->name, pwrkey->forced_shutdown_sts,
+		pwrkey->last_status);
+
+	if (pwrkey->forced_shutdown_sts) {
+		pwrkey->forced_shutdown = true;
+		power_supply_set_property(pwrkey->usb_psy,
+					  POWER_SUPPLY_PROP_ONLINE, &val);
+	}
+}
+
 static irqreturn_t pm8941_pwrkey_irq(int irq, void *_data)
 {
 	struct pm8941_pwrkey *pwrkey = _data;
-	unsigned int sts;
+	unsigned int sts = 0;
+	const char *name;
 	int err;
 
 	if (pwrkey->sw_debounce_time_us) {
@@ -163,6 +195,10 @@ static irqreturn_t pm8941_pwrkey_irq(int irq, void *_data)
 	err = regmap_read(pwrkey->regmap, pwrkey->baseaddr + PON_RT_STS, &sts);
 	if (err)
 		return IRQ_HANDLED;
+
+	pwrkey->forced_shutdown_sts = (sts & (PON_GEN3_KPDPWR_N_SET |
+					      PON_GEN3_RESIN_N_SET)) ==
+				      (PON_GEN3_KPDPWR_N_SET | PON_GEN3_RESIN_N_SET);
 
 	sts &= pwrkey->data->status_bit;
 
@@ -182,6 +218,24 @@ static irqreturn_t pm8941_pwrkey_irq(int irq, void *_data)
 
 	input_report_key(pwrkey->input, pwrkey->code, sts);
 	input_sync(pwrkey->input);
+
+	name = pwrkey->input->name;
+	if (strstr(name, "pmic_pwrkey") || strstr(name, "pmic_resin")) {
+		if (pwrkey->forced_shutdown_sts) {
+			queue_delayed_work(system_wq, &pwrkey->timeout_work,
+					   msecs_to_jiffies(5000));
+		} else if (pwrkey->forced_shutdown) {
+			union power_supply_propval val = { .intval = 0 };
+
+			pwrkey->forced_shutdown = false;
+			if (!IS_ERR(pwrkey->usb_psy) && pwrkey->usb_psy)
+				power_supply_set_property(pwrkey->usb_psy,
+							  POWER_SUPPLY_PROP_ONLINE,
+							  &val);
+		} else {
+			cancel_delayed_work_sync(&pwrkey->timeout_work);
+		}
+	}
 
 	return IRQ_HANDLED;
 }
@@ -340,6 +394,11 @@ static int pm8941_pwrkey_probe(struct platform_device *pdev)
 
 	pwrkey->input->name = pwrkey->data->name;
 	pwrkey->input->phys = pwrkey->data->phys;
+
+	if (strstr(pwrkey->input->name, "pmic_pwrkey") ||
+	    strstr(pwrkey->input->name, "pmic_resin"))
+		INIT_DELAYED_WORK(&pwrkey->timeout_work,
+				  pmic_pwrkey_timeout_handler);
 
 	if (pwrkey->data->supports_debounce_config) {
 		if (pwrkey->subtype >= PON_SUBTYPE_GEN2_PRIMARY) {
