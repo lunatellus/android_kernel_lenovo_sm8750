@@ -486,7 +486,7 @@ static void qcom_lmh_dcvs_notify(struct qcom_cpufreq_data *data)
 				 msecs_to_jiffies(10));
 	}
 
-	trace_dcvsh_freq(cpu, qcom_cpufreq_get_freq(policy), throttled_freq, thermal_pressure);
+	trace_dcvsh_freq(cpu, qcom_cpufreq_get_freq(cpufreq_cpu_get_raw(cpu)), throttled_freq, thermal_pressure);
 
 	/* Update thermal pressure (the boost frequencies are accepted) */
 	arch_update_thermal_pressure(policy->related_cpus, thermal_pressure);
