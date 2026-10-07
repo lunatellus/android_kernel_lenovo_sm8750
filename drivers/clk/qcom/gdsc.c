@@ -497,9 +497,6 @@ static void gdsc_pm_subdomain_remove(struct gdsc_desc *desc, size_t num)
 	for (i = num - 1; i >= 0; i--) {
 		if (!scs[i])
 			continue;
-
-		gdsc_genpd_debug_unregister(scs[i]);
-
 		if (scs[i]->parent)
 			pm_genpd_remove_subdomain(scs[i]->parent, &scs[i]->pd);
 		else if (!IS_ERR_OR_NULL(dev->pm_domain))
