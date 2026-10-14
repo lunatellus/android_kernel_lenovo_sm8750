@@ -32,22 +32,17 @@
 #define FSA4480_DELAY_L_AGND    0x10
 #define FSA4480_RESET           0x1E
 
-struct fsa4480_priv {
-	struct regmap *regmap;
-	struct device *dev;
-	struct typec_mux_dev *mux;
-
-	/* PMIC + power_supply + IIO path */
-	struct power_supply *usb_psy;
-	struct notifier_block nb;
-	struct iio_channel *iio_ch;
-	u32 use_powersupply;
-
-	atomic_t usbc_mode;
-	struct work_struct usbc_analog_work;
-	struct blocking_notifier_head fsa4480_notifier;
-	struct mutex notification_lock;
-};
+bool fsa4480_switch_C1_enable;
+EXPORT_SYMBOL(fsa4480_switch_C1_enable);
+unsigned int audio_4480_headset_ref;
+EXPORT_SYMBOL(audio_4480_headset_ref);
+struct fsa4480_priv *audio_4480_priv1;
+EXPORT_SYMBOL(audio_4480_priv1);
+struct fsa4480_sub_priv *audio_4480_priv2;
+EXPORT_SYMBOL(audio_4480_priv2);
+int direction_value;
+EXPORT_SYMBOL(direction_value);
+extern unsigned int cc_port_num;
 
 struct fsa4480_reg_val {
 	u16 reg;
@@ -153,15 +148,21 @@ static int fsa4480_usbc_mux_set(struct typec_mux_dev *mux,
 	else
 		acc = TYPEC_ACCESSORY_NONE;
 
-	dev_dbg(fsa_priv->dev, "%s: USB change event received, supply mode %d, usbc mode %d, expected %d\n",
-			__func__, acc, fsa_priv->usbc_mode.counter,
-			TYPEC_ACCESSORY_AUDIO);
+	/* Primary switch follows connector 1 only; the secondary switch has
+	 * its own handler in fsa4480-sub-i2c.
+	 */
+	if (cc_port_num != 1)
+		return 0;
 
 	if (acc == TYPEC_ACCESSORY_DEBUG)
 		return 0;
 
 	if (atomic_read(&(fsa_priv->usbc_mode)) != acc) {
 		atomic_set(&(fsa_priv->usbc_mode), acc);
+		if (acc == TYPEC_ACCESSORY_AUDIO)
+			audio_4480_headset_ref++;
+		else if (audio_4480_headset_ref)
+			audio_4480_headset_ref--;
 		dev_dbg(fsa_priv->dev, "%s: queueing usbc_analog_work\n", __func__);
 
 		pm_stay_awake(fsa_priv->dev);

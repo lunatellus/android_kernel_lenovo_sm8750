@@ -1,5 +1,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/mod_devicetable.h>
 
 #define NVT_SPI_NAME "NVT-ts"
 

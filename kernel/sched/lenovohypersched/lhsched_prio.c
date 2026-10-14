@@ -144,11 +144,13 @@ void set_cgroup_hyper_prio(struct task_struct *p)
 	if (!p)
 		return;
 
-	/* Keep the Lenovo cpu-cgroup priority in its reserved task_group slot. */
+	/* Keep the Lenovo cpu-cgroup priority in reserved task_group slot 1
+	 * (6.12 spells the padding __kabi_reserved1, 6.6 android_kabi_reserved1).
+	 */
 	rcu_read_lock();
 	css = task_css(p, cpu_cgrp_id);
 	if (css)
-		prio = (u32)css_tg(css)->android_kabi_reserved1;
+		prio = (u32)css_tg(css)->__kabi_reserved1;
 	rcu_read_unlock();
 
 	lt = LENOVO_TASK(p);

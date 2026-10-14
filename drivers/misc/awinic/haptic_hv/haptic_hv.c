@@ -3896,7 +3896,7 @@ static int aw_i2c_probe(struct i2c_client *i2c)
 	pinctrl_select_state(aw_haptic->pinctrl, aw_haptic->pinctrl_state);
 #endif
 	if (gpio_is_valid(aw_haptic->irq_gpio)) {
-		ret = devm_gpio_request_one(&i2c->dev, aw_haptic->irq_gpio, GPIOF_DIR_IN, "aw_int");
+		ret = devm_gpio_request_one(&i2c->dev, aw_haptic->irq_gpio, GPIOF_IN, "aw_int");
 		if (ret) {
 			aw_err("int request failed");
 			return ret;

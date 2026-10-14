@@ -57,6 +57,9 @@ struct fsa4480_sub_priv {
 extern unsigned int audio_4480_headset_ref;
 extern struct fsa4480_priv *audio_4480_priv1;
 extern struct fsa4480_sub_priv *audio_4480_priv2;
+extern bool fsa4480_switch_C1_enable;
+extern int direction_value;
+extern unsigned int cc_port_num;
 
 int fsa4480_sub_switch_event(struct device_node *node, enum fsa_function event);
 int fsa4480_sub_reg_notifier(struct notifier_block *nb, struct device_node *node);
