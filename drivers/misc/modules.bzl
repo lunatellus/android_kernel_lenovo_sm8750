@@ -1,7 +1,11 @@
+load(":drivers/misc/awinic/haptic_hv/modules.bzl", register_haptic_hv = "register_modules")
+load(":drivers/misc/hq/modules.bzl", register_hq = "register_modules")
 load(":drivers/misc/isl97900_led/modules.bzl", register_isl97900_led = "register_modules")
 load(":drivers/misc/lkdtm/modules.bzl", register_lkdtm = "register_modules")
 
 def register_modules(registry):
+    register_haptic_hv(registry)
+    register_hq(registry)
     register_lkdtm(registry)
     register_isl97900_led(registry)
 

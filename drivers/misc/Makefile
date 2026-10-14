@@ -3,6 +3,8 @@
 ccflags-y += -I$(src)
 
 # Subdirectories
+obj-y += awinic/haptic_hv/
+obj-y += hq/
 obj-y += isl97900_led/
 obj-y += lkdtm/
 
