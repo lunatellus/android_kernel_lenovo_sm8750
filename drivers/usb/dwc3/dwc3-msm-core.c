@@ -7,6 +7,8 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/ctype.h>
+#include <linux/device/class.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/dmapool.h>
@@ -44,6 +46,7 @@
 #include <linux/reset.h>
 #include <linux/usb/dwc3-msm.h>
 #include <linux/usb/role.h>
+#include <linux/usb/ucsi_glink.h>
 #include <linux/usb/redriver.h>
 #include <linux/usb/composite.h>
 #include <linux/usb/typec.h>
@@ -695,6 +698,11 @@ struct dwc3_msm {
 
 	struct typec_retimer	*retimer;
 	bool			disable_xhci_runtime_pm;
+	bool			otg_disabled;
+	struct class		*dual_usb_class;
+	struct device		*dual_usb_dev;
+	enum usb_role		connector_role[2];
+	int			dp_lanes;
 };
 
 #define USB_HSPHY_3P3_VOL_MIN		3050000 /* uV */
@@ -716,6 +724,7 @@ static struct dload_struct __iomem *diag_dload;
 
 static void dwc3_pwr_event_handler(struct dwc3_msm *mdwc);
 static enum usb_role dwc3_msm_get_role(struct dwc3_msm *mdwc);
+static int dwc3_start_stop_host(struct dwc3_msm *mdwc, bool start);
 
 static inline void dwc3_msm_set_usbphy_flags(struct usb_phy *phy,
 					     unsigned int flags)
@@ -5587,9 +5596,75 @@ static enum usb_role dwc3_msm_usb_role_switch_get_role(struct usb_role_switch *s
 	return role;
 }
 
+static void dwc3_msm_dual_usb_release(void *data)
+{
+	struct dwc3_msm *mdwc = data;
+
+	device_unregister(mdwc->dual_usb_dev);
+	class_destroy(mdwc->dual_usb_class);
+}
+
+static int dwc3_msm_dual_usb_init(struct dwc3_msm *mdwc)
+{
+	struct device_node *node;
+
+	if (!IS_REACHABLE(CONFIG_UCSI_QTI_GLINK) ||
+	    !of_property_read_bool(mdwc->dev->of_node, "usb-role-switch"))
+		return 0;
+
+	node = of_find_compatible_node(NULL, NULL, "qcom,fsa4480-sub-i2c");
+	if (!node)
+		return 0;
+	if (!of_device_is_available(node)) {
+		of_node_put(node);
+		return 0;
+	}
+	of_node_put(node);
+
+	mdwc->dual_usb_class = class_create("douusb");
+	if (IS_ERR(mdwc->dual_usb_class))
+		return PTR_ERR(mdwc->dual_usb_class);
+
+	mdwc->dual_usb_dev = device_create(mdwc->dual_usb_class, mdwc->dev,
+					  0, NULL, "usbc1c2");
+	if (IS_ERR(mdwc->dual_usb_dev)) {
+		int ret = PTR_ERR(mdwc->dual_usb_dev);
+
+		class_destroy(mdwc->dual_usb_class);
+		return ret;
+	}
+
+	return devm_add_action_or_reset(mdwc->dev, dwc3_msm_dual_usb_release, mdwc);
+}
+
+static void dwc3_msm_get_otg_enable(struct dwc3_msm *mdwc)
+{
+	struct device_node *node;
+	const char *bootargs, *arg;
+	const char *key = "usb_otg_dis=";
+
+	node = of_find_node_by_path("/chosen");
+	if (!node)
+		return;
+	if (!of_property_read_string(node, "bootargs", &bootargs)) {
+		arg = bootargs;
+		while ((arg = strstr(arg, key))) {
+			if (arg == bootargs || isspace(arg[-1])) {
+				arg += strlen(key);
+				mdwc->otg_disabled = *arg == '1' &&
+					(!arg[1] || isspace(arg[1]));
+				break;
+			}
+			arg += strlen(key);
+		}
+	}
+	of_node_put(node);
+}
+
 static int dwc3_msm_set_role(struct dwc3_msm *mdwc, enum usb_role role)
 {
 	enum usb_role cur_role;
+	int ret;
 
 	if (mdwc->dis_role_switch)
 		return -EPERM;
@@ -5603,6 +5678,28 @@ static int dwc3_msm_set_role(struct dwc3_msm *mdwc, enum usb_role role)
 	dbg_log_string("cur_role:%s new_role:%s refcnt:%d\n", dwc3_msm_usb_role_string(cur_role),
 				dwc3_msm_usb_role_string(role), mdwc->refcnt_dp_usb);
 
+#if IS_REACHABLE(CONFIG_UCSI_QTI_GLINK)
+	if (mdwc->dual_usb_dev) {
+		int connector = READ_ONCE(con_now);
+		int c1_present = READ_ONCE(C1_d_present);
+		int c2_present = READ_ONCE(C2_d_present);
+		char *dual[] = { "DOU_USB=usb2port", NULL };
+		char *single[] = { "DOU_USB=usb1or0port", NULL };
+
+		if (connector == 1 || connector == 2)
+			mdwc->connector_role[connector - 1] = role;
+
+		if (connector == 2 && c1_present)
+			role = cur_role;
+		else if (role == USB_ROLE_NONE && connector == 1 &&
+			 !c1_present && c2_present)
+			role = mdwc->connector_role[1];
+
+		kobject_uevent_env(&mdwc->dual_usb_dev->kobj, KOBJ_CHANGE,
+				   c1_present && c2_present ? dual : single);
+	}
+#endif
+
 	/*
 	 * For boot up without USB cable connected case, don't check
 	 * previous role value to allow resetting USB controller and
@@ -5610,6 +5707,19 @@ static int dwc3_msm_set_role(struct dwc3_msm *mdwc, enum usb_role role)
 	 */
 	if (mdwc->drd_state != DRD_STATE_UNDEFINED && cur_role == role) {
 		dbg_log_string("no USB role change");
+#if IS_REACHABLE(CONFIG_UCSI_QTI_GLINK)
+		if (mdwc->dual_usb_dev && READ_ONCE(con_now) == 1 &&
+		    mdwc->connector_role[0] == USB_ROLE_HOST &&
+		    READ_ONCE(C2_d_present) && !mdwc->dp_lanes) {
+			ret = dwc3_start_stop_host(mdwc, false);
+			if (!ret)
+				ret = dwc3_start_stop_host(mdwc, true);
+			if (ret) {
+				mutex_unlock(&mdwc->role_switch_mutex);
+				return ret;
+			}
+		}
+#endif
 		mutex_unlock(&mdwc->role_switch_mutex);
 		return 0;
 	}
@@ -5925,12 +6035,37 @@ static ssize_t dynamic_disable_store(struct device *dev, struct device_attribute
 }
 static DEVICE_ATTR_WO(dynamic_disable);
 
+static ssize_t otg_enable_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+
+	return sysfs_emit(buf, "%c\n", READ_ONCE(mdwc->otg_disabled) ? 'n' : 'y');
+}
+
+static ssize_t otg_enable_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct dwc3_msm *mdwc = dev_get_drvdata(dev);
+	bool enable;
+	int ret;
+
+	ret = kstrtobool(buf, &enable);
+	if (ret)
+		return ret;
+	WRITE_ONCE(mdwc->otg_disabled, !enable);
+	return count;
+}
+static DEVICE_ATTR_RW(otg_enable);
+
 static struct attribute *dwc3_msm_attrs[] = {
 	&dev_attr_orientation.attr,
 	&dev_attr_mode.attr,
 	&dev_attr_speed.attr,
 	&dev_attr_bus_vote.attr,
 	&dev_attr_xhci_test.attr,
+	&dev_attr_otg_enable.attr,
 	&dev_attr_dynamic_disable.attr,
 	NULL
 };
@@ -6087,6 +6222,8 @@ int dwc3_msm_set_dp_mode(struct device *dev, bool dp_connected, int lanes, int o
 		dev_err(dev, "dwc3-msm is not initialized yet.\n");
 		return -EAGAIN;
 	}
+
+	mdwc->dp_lanes = dp_connected ? lanes : 0;
 
 	dev_dbg(dev, "lanes %d, connect %d\n", lanes, dp_connected);
 	/* flush any pending work */
@@ -7053,6 +7190,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mdwc);
 	mdwc->dev = &pdev->dev;
+	dwc3_msm_get_otg_enable(mdwc);
 
 	if ((of_device_is_compatible(dev->of_node, "qcom,dwc3-msm-fw-managed"))) {
 		mdwc->fw_managed_pwr = true;
@@ -7151,6 +7289,10 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 	mutex_init(&mdwc->suspend_resume_mutex);
 	mutex_init(&mdwc->role_switch_mutex);
 	mdwc->dis_role_switch = false;
+
+	ret = dwc3_msm_dual_usb_init(mdwc);
+	if (ret)
+		goto put_dwc3;
 
 	if (of_property_read_bool(node, "usb-role-switch")) {
 		struct usb_role_switch_desc role_desc = {
@@ -7694,6 +7836,10 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 	int ret = 0;
 	u32 reg;
 	struct dwc3 *dwc = platform_get_drvdata(mdwc->dwc3);
+
+	/* Disabling OTG must never prevent an already-active host stopping. */
+	if (on && READ_ONCE(mdwc->otg_disabled))
+		return -EPERM;
 
 	if (on) {
 		dev_dbg(mdwc->dev, "%s: turn on host\n", __func__);

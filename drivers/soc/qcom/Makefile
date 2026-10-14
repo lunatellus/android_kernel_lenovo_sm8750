@@ -194,6 +194,7 @@ wcd_usbss_i2c-objs += wcd-usbss-regmap.o wcd-usbss-tables.o wcd-usbss-utils.o wc
 
 obj-$(CONFIG_QCOM_FSA4480_I2C) += fsa4480_i2c.o
 fsa4480_i2c-objs += fsa4480-i2c.o
+obj-$(CONFIG_QCOM_FSA4480_SUB_I2C) += fsa4480-sub-i2c.o
 
 obj-$(CONFIG_RENAME_DEVICES) += rename_devices.o
 

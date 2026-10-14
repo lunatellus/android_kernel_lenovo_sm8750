@@ -37,3 +37,19 @@ def register_modules(registry):
             "drivers/usb/repeater/repeater",
         ],
     )
+
+    registry.register(
+        name = "drivers/usb/repeater/hq_ptn3222_repeater",
+        out = "hq_ptn3222_repeater.ko",
+        config = "CONFIG_HQ_PTN3222_REPEATER",
+        srcs = [
+            # do not sort
+            "drivers/usb/repeater/hq_ptn3222_repeater.c",
+        ],
+        deps = [
+            # do not sort
+            "drivers/usb/repeater/repeater",
+            "drivers/usb/typec/ucsi/ucsi_qti_glink",
+            "drivers/base/regmap/qti-regmap-debugfs",
+        ],
+    )

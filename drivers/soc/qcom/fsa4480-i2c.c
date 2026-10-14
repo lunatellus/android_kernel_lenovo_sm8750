@@ -171,6 +171,143 @@ static int fsa4480_usbc_mux_set(struct typec_mux_dev *mux,
 	return 0;
 }
 
+static int fsa4480_dual_analog_setup_switches(struct fsa4480_priv *fsa_priv)
+{
+	unsigned int reg6, reg4, reg17, tmp;
+	unsigned int priv2_reg6, reg_value;
+	int mode, i;
+
+	if (!fsa_priv->dev)
+		return -EINVAL;
+	reg6 = 0;
+	reg4 = 0;
+	reg17 = 0;
+	tmp = 0;
+	priv2_reg6 = 0;
+	reg_value = 0;
+
+	mutex_lock(&fsa_priv->notification_lock);
+	/* get latest mode again within locked context */
+	mode = atomic_read(&fsa_priv->usbc_mode);
+
+	switch (mode) {
+	case TYPEC_ACCESSORY_AUDIO:
+		fsa4480_switch_C1_enable = 1;
+		regmap_write(fsa_priv->regmap, FSA4480_RESET, 1);
+		for (i = FSA4480_SLOW_L; i <= FSA4480_SLOW_GND; i++) {
+			regmap_write(fsa_priv->regmap, i, 0x4f);
+			regmap_read(fsa_priv->regmap, i, &tmp);
+		}
+		regmap_read(fsa_priv->regmap, 0, &reg_value);
+		if (reg_value == 0xf1)
+			regmap_write(fsa_priv->regmap, 0x1c, 0);
+
+		regmap_write(fsa_priv->regmap, FSA4480_SWITCH_SETTINGS, 0x9f);
+		regmap_read(fsa_priv->regmap, FSA4480_SWITCH_SETTINGS, &tmp);
+		regmap_write(fsa_priv->regmap, FSA4480_SWITCH_CONTROL, 0);
+		regmap_read(fsa_priv->regmap, FSA4480_SWITCH_CONTROL, &tmp);
+		regmap_write(fsa_priv->regmap, 0x12, 0x0d);
+		regmap_read(fsa_priv->regmap, 0x12, &tmp);
+		for (i = 0; i < 10; i++) {
+			msleep(5);
+			if (tmp == 0x0c)
+				break;
+			regmap_read(fsa_priv->regmap, 0x12, &tmp);
+		}
+		msleep(1000);
+
+		regmap_read(fsa_priv->regmap, 0x17, &reg17);
+		regmap_read(fsa_priv->regmap, 6, &reg6);
+		regmap_read(fsa_priv->regmap, FSA4480_SWITCH_SETTINGS, &reg4);
+		dev_info(fsa_priv->dev, "%s: reg4: %d, reg_value: %d\n",
+			 __func__, reg4, reg6);
+		regmap_read(fsa_priv->regmap, 0, &reg_value);
+		if (reg17 == 1 || reg6 == 5) {
+			regmap_write(fsa_priv->regmap, FSA4480_RESET, 1);
+			fsa4480_usbc_update_settings(fsa_priv, 0x00, 0x9f);
+			msleep(5);
+		}
+		if (reg17 == 2) {
+			regmap_write(fsa_priv->regmap, FSA4480_SWITCH_SETTINGS, 0x87);
+			msleep(1);
+			regmap_write(fsa_priv->regmap, FSA4480_SWITCH_CONTROL, 0x07);
+			msleep(5);
+			regmap_write(fsa_priv->regmap, FSA4480_SWITCH_SETTINGS, 0x9f);
+			msleep(5);
+		}
+
+		if (reg6 == 5 || reg6 == 0x1a)
+			direction_value = 1;
+		else if (reg6 == 0x2a)
+			direction_value = 2;
+		else
+			direction_value = 0;
+
+		/* notify call chain on event */
+		blocking_notifier_call_chain(&fsa_priv->fsa4480_notifier,
+					     mode, NULL);
+		break;
+	case TYPEC_ACCESSORY_NONE:
+		fsa4480_switch_C1_enable = 0;
+		/* notify call chain on event */
+		blocking_notifier_call_chain(&fsa_priv->fsa4480_notifier,
+				TYPEC_ACCESSORY_NONE, NULL);
+
+		/* deactivate switches */
+		regmap_write(fsa_priv->regmap, FSA4480_RESET, 1);
+		fsa4480_usbc_update_settings(fsa_priv, 0x18, 0x98);
+
+		if (!audio_4480_headset_ref || !audio_4480_priv2)
+			break;
+
+		/* the other port still carries a headset: set the sub switch up again */
+		regmap_write(audio_4480_priv2->regmap, FSA4480_RESET, 1);
+		for (i = FSA4480_SLOW_L; i <= FSA4480_SLOW_GND; i++)
+			regmap_write(audio_4480_priv2->regmap, i, 0x4f);
+		regmap_read(audio_4480_priv2->regmap, 0, &reg_value);
+		if (reg_value == 0xf1)
+			regmap_write(audio_4480_priv2->regmap, 0x1c, 0);
+		regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_SETTINGS, 0x9f);
+		regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_CONTROL, 0);
+		regmap_write(audio_4480_priv2->regmap, 0x12, 0x0d);
+		regmap_read(audio_4480_priv2->regmap, 0x12, &tmp);
+		for (i = 0; i < 10; i++) {
+			msleep(5);
+			if (tmp == 0x0c)
+				break;
+			regmap_read(audio_4480_priv2->regmap, 0x12, &tmp);
+		}
+		msleep(1000);
+
+		regmap_read(audio_4480_priv2->regmap, 0x17, &reg17);
+		regmap_read(audio_4480_priv2->regmap, 6, &priv2_reg6);
+		if (reg17 == 1 || priv2_reg6 == 5) {
+			regmap_write(audio_4480_priv2->regmap, FSA4480_RESET, 1);
+			regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_SETTINGS, 0x80);
+			regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_CONTROL, 0);
+			usleep_range(50, 55);
+			regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_SETTINGS, 0x9f);
+			msleep(5);
+		}
+		if (reg17 == 2) {
+			regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_SETTINGS, 0x87);
+			msleep(1);
+			regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_CONTROL, 0x07);
+			msleep(5);
+			regmap_write(audio_4480_priv2->regmap, FSA4480_SWITCH_SETTINGS, 0x9f);
+			msleep(5);
+		}
+		blocking_notifier_call_chain(&audio_4480_priv2->fsa4480_sub_notifier,
+					     TYPEC_ACCESSORY_AUDIO, NULL);
+		break;
+	default:
+		/* ignore other usb connection modes */
+		break;
+	}
+
+	mutex_unlock(&fsa_priv->notification_lock);
+	return 0;
+}
 static int fsa4480_usbc_analog_setup_switches(struct fsa4480_priv *fsa_priv)
 {
 	int rc = 0;
@@ -392,6 +529,73 @@ static void fsa4480_update_reg_defaults(struct regmap *regmap)
 				   fsa_reg_i2c_defaults[i].val);
 }
 
+static ssize_t direction_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct fsa4480_priv *fsa_priv = dev_get_drvdata(dev);
+	unsigned int reg_value = 0, reg4 = 0;
+
+	regmap_read(fsa_priv->regmap, 6, &reg_value);
+	regmap_read(fsa_priv->regmap, FSA4480_SWITCH_SETTINGS, &reg4);
+	dev_info(fsa_priv->dev, "%s: reg4: %d, reg_value: %d\n",
+		 __func__, reg4, reg_value);
+
+	if (reg_value == 0x1a)
+		direction_value = 1;
+	else if (reg_value == 0x2a)
+		direction_value = 2;
+	else
+		direction_value = 0;
+	return snprintf(buf, PAGE_SIZE, "%d\n", direction_value);
+}
+
+static ssize_t direction_store(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct fsa4480_priv *fsa_priv = dev_get_drvdata(dev);
+	unsigned int data[2] = { 0, 0 };
+
+	if (sscanf(buf, "%x %x", &data[0], &data[1]) == 2)
+		regmap_write(fsa_priv->regmap, data[0], data[1]);
+
+	dev_info(fsa_priv->dev, "%s: databuf[0]:%x, databuf[1]:%x\n",
+		 __func__, data[0], data[1]);
+	return count;
+}
+static DEVICE_ATTR_RW(direction);
+
+static ssize_t reg_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct fsa4480_priv *fsa_priv = dev_get_drvdata(dev);
+	unsigned int reg, value;
+	ssize_t len = 0;
+	int ret;
+
+	if (!fsa_priv->regmap)
+		printk("%s: regmap invalid\n", __func__);
+
+	for (reg = FSA4480_SWITCH_SETTINGS; reg <= FSA4480_RESET; reg++) {
+		regmap_read(fsa_priv->regmap, reg, &value);
+		ret = snprintf(buf + len, PAGE_SIZE - len,
+			       "reg[0x%x]=0x%x.\n", reg, value);
+		len += ret;
+	}
+
+	return len;
+}
+static DEVICE_ATTR_RO(reg);
+
+static struct attribute *fsa4480_attributes[] = {
+	&dev_attr_direction.attr,
+	&dev_attr_reg.attr,
+	NULL,
+};
+
+static struct attribute_group fsa4480_attribute_group = {
+	.attrs = fsa4480_attributes,
+};
 static int fsa4480_probe(struct i2c_client *i2c)
 {
 	struct typec_mux_desc mux_desc = { };

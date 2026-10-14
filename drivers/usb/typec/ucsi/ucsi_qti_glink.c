@@ -8,12 +8,15 @@
 #include <clocksource/arm_arch_timer.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
+#include <linux/delay.h>
+#include <linux/gpio/consumer.h>
 #include <linux/ipc_logging.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/soc/qcom/qti_pmic_glink.h>
+#include <linux/usb/ucsi_glink.h>
 
 #include "drivers/usb/typec/ucsi/ucsi.h"
 
@@ -93,6 +96,8 @@ struct ucsi_dev {
 	struct work_struct		unregister_work;
 	atomic_t			state;
 	bool				remoteproc_timestamp_en;
+	struct gpio_desc		*usb_mux;
+	u8				status_connector;
 };
 
 struct remoteproc_ts {
@@ -103,6 +108,98 @@ struct remoteproc_ts {
 };
 
 static void *ucsi_ipc_log;
+
+unsigned int cc_port_num;
+EXPORT_SYMBOL(cc_port_num);
+int C1_d_present;
+EXPORT_SYMBOL(C1_d_present);
+int C2_d_present;
+EXPORT_SYMBOL(C2_d_present);
+int con_now;
+EXPORT_SYMBOL(con_now);
+
+static BLOCKING_NOTIFIER_HEAD(ucsi_glink_notifier);
+
+int register_ucsi_glink_notifier(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_register(&ucsi_glink_notifier, nb);
+}
+EXPORT_SYMBOL(register_ucsi_glink_notifier);
+
+int unregister_ucsi_glink_notifier(struct notifier_block *nb)
+{
+	return blocking_notifier_chain_unregister(&ucsi_glink_notifier, nb);
+}
+EXPORT_SYMBOL(unregister_ucsi_glink_notifier);
+
+/*
+ * The two connectors share one USB controller and data mux. C1 wins when
+ * both carry data; PD-only and analog audio partners do not own the mux.
+ * Read connector status only after GET_CONNECTOR_STATUS, not from arbitrary
+ * MESSAGE_IN payloads (which can also contain capabilities or PD messages).
+ */
+static void ucsi_qti_update_connector(struct ucsi_dev *udev,
+				     const struct ucsi_connector_status *status,
+				     u8 connector)
+{
+	struct ucsi_glink_constat_info info = { .connector = connector };
+	u16 flags = status->flags;
+	u8 partner = UCSI_CONSTAT_PARTNER_TYPE(flags);
+	u8 opmode = UCSI_CONSTAT_PWR_OPMODE(flags);
+	bool usb = UCSI_CONSTAT_PARTNER_FLAGS(flags) & UCSI_CONSTAT_PARTNER_FLAG_USB;
+	int *present;
+	bool changed = false;
+
+	if (connector != 1 && connector != 2)
+		return;
+
+	present = connector == 1 ? &C1_d_present : &C2_d_present;
+	WRITE_ONCE(cc_port_num, connector);
+	WRITE_ONCE(con_now, connector);
+	if (status->change) {
+		if (!flags || partner == UCSI_CONSTAT_PARTNER_TYPE_AUDIO) {
+			WRITE_ONCE(*present, 0);
+			changed = true;
+		} else if (usb &&
+			   (((partner == UCSI_CONSTAT_PARTNER_TYPE_DFP ||
+			      partner == UCSI_CONSTAT_PARTNER_TYPE_UFP) &&
+			     (opmode == 1 || opmode == 4 || opmode == 5)) ||
+			    (partner == UCSI_CONSTAT_PARTNER_TYPE_DFP && opmode == 3) ||
+			    (!partner && (opmode == 1 || opmode == 4 || opmode == 5)) ||
+			    (partner == UCSI_CONSTAT_PARTNER_TYPE_CABLE_AND_UFP &&
+			     opmode != 0 && opmode != 2))) {
+			WRITE_ONCE(*present, 1);
+			changed = true;
+		} else if ((!usb && opmode == 3 &&
+			    (partner == UCSI_CONSTAT_PARTNER_TYPE_DFP ||
+			     partner == UCSI_CONSTAT_PARTNER_TYPE_UFP)) ||
+			   (connector == 1 && opmode == 3 &&
+			    ((usb && partner == UCSI_CONSTAT_PARTNER_TYPE_UFP) ||
+			     (!usb && partner == UCSI_CONSTAT_PARTNER_TYPE_CABLE_AND_UFP)))) {
+			WRITE_ONCE(*present, 0);
+			changed = true;
+		}
+	}
+
+	if (changed && udev->usb_mux &&
+	    (READ_ONCE(C1_d_present) || READ_ONCE(C2_d_present))) {
+		gpiod_set_value_cansleep(udev->usb_mux, !READ_ONCE(C1_d_present));
+		usleep_range(10000, 11000);
+	}
+
+	switch (partner) {
+	case UCSI_CONSTAT_PARTNER_TYPE_AUDIO:
+		info.acc = TYPEC_ACCESSORY_AUDIO;
+		break;
+	case UCSI_CONSTAT_PARTNER_TYPE_DEBUG:
+		info.acc = TYPEC_ACCESSORY_DEBUG;
+		break;
+	default:
+		info.acc = TYPEC_ACCESSORY_NONE;
+		break;
+	}
+	blocking_notifier_call_chain(&ucsi_glink_notifier, 0, &info);
+}
 
 static char *offset_to_name(unsigned int offset)
 {
@@ -275,6 +372,10 @@ static int handle_ucsi_notify(struct ucsi_dev *udev, void *data, size_t len)
 	}
 
 	con_num = UCSI_CCI_CONNECTOR(cci);
+	if (con_num == 1 || con_num == 2) {
+		WRITE_ONCE(cc_port_num, con_num);
+		WRITE_ONCE(con_now, con_num);
+	}
 	pr_debug("con_num: %u num_connectors: %u\n", con_num,
 		udev->ucsi->cap.num_connectors);
 
@@ -342,6 +443,8 @@ static int ucsi_qti_glink_write(struct ucsi_dev *udev, unsigned int offset,
 {
 	struct ucsi_write_buf_req_msg *ucsi_buf;
 	size_t tx_len;
+	unsigned long timeout = msecs_to_jiffies(UCSI_WAIT_TIME_MS);
+	u64 control = 0;
 	int rc;
 
 	if (!validate_ucsi_msg(udev, offset, val_len))
@@ -387,8 +490,13 @@ static int ucsi_qti_glink_write(struct ucsi_dev *udev, unsigned int offset,
 	}
 
 	if (sync) {
+		if (offset == UCSI_CONTROL && val_len == sizeof(control)) {
+			memcpy(&control, val, sizeof(control));
+			if (control == 0x02820009 || control == 0x03020009)
+				timeout = msecs_to_jiffies(1000);
+		}
 		rc = wait_for_completion_timeout(&udev->sync_write_ack,
-					msecs_to_jiffies(UCSI_WAIT_TIME_MS));
+					timeout);
 		if (!rc) {
 			pr_err("timed out for sync_write_ack\n");
 			rc = -ETIMEDOUT;
@@ -419,8 +527,14 @@ static int ucsi_qti_sync_control(struct ucsi *ucsi, u64 command)
 {
 	struct ucsi_dev *udev = ucsi_get_drvdata(ucsi);
 
-	return ucsi_qti_glink_write(udev, UCSI_CONTROL, &command,
-				sizeof(command), true);
+	int ret;
+
+	WRITE_ONCE(udev->status_connector, 0);
+	ret = ucsi_qti_glink_write(udev, UCSI_CONTROL, &command,
+				  sizeof(command), true);
+	if (!ret && UCSI_COMMAND(command) == UCSI_GET_CONNECTOR_STATUS)
+		WRITE_ONCE(udev->status_connector, (command >> 16) & 0x7f);
+	return ret;
 }
 
 static int ucsi_qti_read(struct ucsi_dev *udev, unsigned int offset,
@@ -494,7 +608,15 @@ static int ucsi_qti_read_message_in(struct ucsi *ucsi, void *val,
 {
 	struct ucsi_dev *udev = ucsi_get_drvdata(ucsi);
 
-	return ucsi_qti_read(udev, UCSI_MESSAGE_IN, val, val_len);
+	u8 connector = READ_ONCE(udev->status_connector);
+	int ret;
+
+	ret = ucsi_qti_read(udev, UCSI_MESSAGE_IN, val, val_len);
+	if (!ret && connector && val_len >= sizeof(struct ucsi_connector_status)) {
+		WRITE_ONCE(udev->status_connector, 0);
+		ucsi_qti_update_connector(udev, val, connector);
+	}
+	return ret;
 }
 
 static const struct ucsi_operations ucsi_qti_ops = {
@@ -611,6 +733,12 @@ static int ucsi_probe(struct platform_device *pdev)
 	init_completion(&udev->sync_write_ack);
 	atomic_set(&udev->rx_valid, 0);
 	atomic_set(&udev->state, PMIC_GLINK_STATE_UP);
+
+	/* The stock elden binding uses the unnamed "gpios" data-mux GPIO. */
+	udev->usb_mux = devm_gpiod_get_optional(dev, NULL, GPIOD_OUT_LOW);
+	if (IS_ERR(udev->usb_mux))
+		return dev_err_probe(dev, PTR_ERR(udev->usb_mux),
+				     "failed to get USB data mux\n");
 
 	client_data.id = MSG_OWNER_UC;
 	client_data.name = "ucsi";

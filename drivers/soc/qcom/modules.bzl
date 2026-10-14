@@ -1647,6 +1647,29 @@ def register_modules(registry):
     )
 
     registry.register(
+        name = "drivers/soc/qcom/fsa4480_sub_i2c",
+        out = "fsa4480-sub-i2c.ko",
+        config = "CONFIG_QCOM_FSA4480_SUB_I2C",
+        srcs = [
+            # do not sort
+            "drivers/soc/qcom/fsa4480-sub-i2c.c",
+        ],
+        deps = [
+            # do not sort
+            "drivers/soc/qcom/fsa4480_i2c",
+            "drivers/usb/typec/ucsi/ucsi_qti_glink",
+            "drivers/base/regmap/qti-regmap-debugfs",
+            "drivers/soc/qcom/qti_pmic_glink",
+            "drivers/soc/qcom/pdr_interface",
+            "drivers/soc/qcom/qmi_helpers",
+            "drivers/remoteproc/rproc_qcom_common",
+            "drivers/rpmsg/qcom_smd",
+            "drivers/rpmsg/qcom_glink_smem",
+            "drivers/rpmsg/qcom_glink",
+        ],
+    )
+
+    registry.register(
         name = "drivers/soc/qcom/rename_devices",
         out = "rename_devices.ko",
         config = "CONFIG_RENAME_DEVICES",

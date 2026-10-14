@@ -34,4 +34,13 @@ config I2C_EUSB2_REPEATER
 	  for USB HS/FS/LS functionality where eUSB2 repeater is used.
 
 	  To compile this driver as a module, choose M here.
+
+config HQ_PTN3222_REPEATER
+	tristate "Huaqin dual-port I2C eUSB2 repeater"
+	depends on ARCH_QCOM && USB_REPEATER && I2C && UCSI_QTI_GLINK
+	select REGMAP_I2C
+	help
+	  Support the NXP PTN3222 and TI I2C eUSB2 repeaters on Lenovo dual
+	  USB-C devices, with per-connector tuning and register restoration.
+
 endmenu
