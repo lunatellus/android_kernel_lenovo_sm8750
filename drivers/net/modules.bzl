@@ -26,6 +26,63 @@ def register_modules(registry):
             "include/dt-bindings/net/ti-dp83867.h",
         ],
     )
+
+    registry.register(
+        name = "drivers/net/hq_mii",
+        out = "hq_mii.ko",
+        config = "CONFIG_HQ_MII",
+        srcs = [
+            # do not sort
+            "drivers/net/hq_mii.c",
+            "drivers/net/hq_mii.h",
+        ],
+    )
+
+    registry.register(
+        name = "drivers/net/phy/hq_smsc",
+        out = "hq_smsc.ko",
+        config = "CONFIG_HQ_SMSC_PHY",
+        srcs = [
+            # do not sort
+            "drivers/net/phy/hq_smsc.c",
+            "drivers/net/phy/hq_smsc.h",
+        ],
+    )
+
+    registry.register(
+        name = "drivers/net/usb/hq_usbnet",
+        out = "hq_usbnet.ko",
+        config = "CONFIG_HQ_USBNET",
+        srcs = [
+            # do not sort
+            "drivers/net/usb/hq_usbnet.c",
+            "drivers/net/usb/hq_usbnet.h",
+            "drivers/net/hq_mii.h",
+        ],
+        deps = [
+            # do not sort
+            "drivers/net/hq_mii",
+        ],
+    )
+
+    registry.register(
+        name = "drivers/net/usb/smsc95xx",
+        out = "smsc95xx.ko",
+        config = "CONFIG_USB_NET_SMSC95XX",
+        srcs = [
+            # do not sort
+            "drivers/net/usb/smsc95xx.c",
+            "drivers/net/usb/smsc95xx.h",
+            "drivers/net/usb/hq_usbnet.h",
+            "drivers/net/hq_mii.h",
+        ],
+        deps = [
+            # do not sort
+            "drivers/net/usb/hq_usbnet",
+            "drivers/net/phy/hq_smsc",
+            "drivers/misc/hq/hq_kallsyms/hq_kallsyms",
+        ],
+    )
     registry.register(
         name = "net/core/failover",
         out = "failover.ko",

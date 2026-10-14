@@ -35,6 +35,7 @@ icc-clk.ko
 clk-qcom.ko
 qcom_cpu_vendor_hooks.ko
 sched-walt.ko
+lenovohyperSched.ko
 sched-walt-debug.ko
 thermal_pause.ko
 cpu_hotplug.ko
