@@ -59,6 +59,7 @@ obj-y += slimbus/
 obj-y += soc/
 obj-y += spi/
 obj-y += spmi/
+obj-y += thermal/
 obj-y += thermal/qcom/
 obj-y += tty/
 obj-y += ufs/host/

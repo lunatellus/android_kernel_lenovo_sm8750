@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: GPL-2.0-only
+menu "Huaqin device drivers"
+
+config HQ_SYSFS
+	tristate "Huaqin hardware information sysfs"
+	depends on SCSI_UFSHCD && GPIOLIB && THERMAL
+	help
+	  Publishes per-component hardware names below
+	  /sys/class/hardinfo/interface/hardware_info/ and exports
+	  hq_regiser_hw_info() for vendor drivers to register them.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called hqsysfs.
+
+config HQ_KALLSYMS
+	tristate "Huaqin kallsyms helper"
+	depends on KPROBES && OF
+	help
+	  Exports hq_kallsyms_lookup_name() to vendor modules, resolving
+	  kallsyms_lookup_name() through a kprobe because GKI does not export it.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called hq_kallsyms.
+
+config HQ_UFSFFU
+	tristate "Huaqin UFS field firmware update"
+	depends on SCSI_UFSHCD
+	help
+	  Loads an OEM UFS firmware table and performs UFS field firmware
+	  updates (FFU) with SCSI WRITE BUFFER commands for matching devices.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called ufsffu.
+
+config HQ_EXTEND_RECLAIM
+	tristate "Extended global page reclaim interface"
+	depends on MEMCG && ANDROID_VENDOR_HOOKS
+	help
+	  Provides a sysfs interface to trigger global page reclaim from
+	  userspace.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called extend_reclaim.
+
+config HQ_REGISTER_DUMPER
+	tristate "Huaqin regmap register dumper"
+	depends on HQ_KALLSYMS && KPROBES && REGMAP && PROC_FS && ARM64
+	help
+	  Provides procfs nodes to dump registers of regmap-backed devices for
+	  debugging.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called register_dumper.
+
+config HQ_MAGIC_KEY
+	tristate "Huaqin magic key debug trigger"
+	depends on INPUT && SCHED_INFO
+	help
+	  Watches a key sequence on input devices and, when it completes,
+	  either triggers a panic or dumps uninterruptible tasks for debugging.
+
+	  To compile this driver as a module, choose M here: the module will be
+	  called magic_key.
+
+endmenu

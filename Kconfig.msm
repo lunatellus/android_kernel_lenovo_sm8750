@@ -114,6 +114,8 @@ source "$(KCONFIG_EXT_PREFIX)drivers/spi/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/spmi/Kconfig"
 
+source "$(KCONFIG_EXT_PREFIX)drivers/thermal/Kconfig"
+
 source "$(KCONFIG_EXT_PREFIX)drivers/thermal/qcom/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)drivers/tty/hvc/Kconfig"
@@ -139,6 +141,8 @@ source "$(KCONFIG_EXT_PREFIX)drivers/virt/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/virtio/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)init/Kconfig"
+
+source "$(KCONFIG_EXT_PREFIX)kernel/sched/lenovohypersched/Kconfig"
 
 source "$(KCONFIG_EXT_PREFIX)kernel/sched/walt/Kconfig"
 
