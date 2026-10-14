@@ -72,6 +72,9 @@ def define_techpack_modules(target, msm_target, variant):
             "//{}/st/opensource/driver:{}_stm_nfc_i2c".format(SOC_MODULES_REPO_PATH, target),
             "//{}/st/opensource/eSE-driver:{}_stm_st54se_gpio".format(SOC_MODULES_REPO_PATH, target),
         ]
+        # Stock elden vendor_dlkm has no msm_hfi_core.ko and neither
+        # msm-eva.ko nor msm_video.ko depends on it.
+        techpack_targets = [t for t in techpack_targets if "/mm-drivers/hfi_core:" not in t]
 
     # 1. Define how files are packaged (permissions + flattening)
     pkg_files(
