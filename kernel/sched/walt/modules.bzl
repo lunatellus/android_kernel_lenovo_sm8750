@@ -59,6 +59,7 @@ def register_modules(registry):
         },
         deps = [
             # do not sort
+            "kernel/sched/lenovohypersched/lenovohyperSched",
             "drivers/soc/qcom/socinfo",
             "drivers/soc/qcom/smem",
         ],

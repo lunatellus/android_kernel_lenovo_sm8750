@@ -1,11 +1,13 @@
 load(":kernel/locking/modules.bzl", register_locking = "register_modules")
 load(":kernel/rcu/modules.bzl", register_rcu = "register_modules")
+load(":kernel/sched/lenovohypersched/modules.bzl", register_lenovohypersched = "register_modules")
 load(":kernel/sched/walt/modules.bzl", register_sched_walt = "register_modules")
 load(":kernel/trace/modules.bzl", register_trace = "register_modules")
 
 def register_modules(registry):
     register_locking(registry)
     register_rcu(registry)
+    register_lenovohypersched(registry)
     register_sched_walt(registry)
     register_trace(registry)
 

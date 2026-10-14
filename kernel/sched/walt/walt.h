@@ -1881,6 +1881,10 @@ DECLARE_PER_CPU(unsigned int, walt_yield_to_sleep);
 extern unsigned int walt_sched_yield_counter;
 extern unsigned int sysctl_force_frequent_yielder;
 void account_yields(u64 window_start);
+
+/* Lenovo hooks are registered before WALT so UX selection takes precedence. */
+extern bool hyper_module_modprobe_finish;
+bool lenovo_hyper_task_selected(struct rq *rq, struct task_struct *p);
 extern unsigned int sysctl_pipeline_force_config;
 extern unsigned long walt_cpu_energy(int cpu,
 				     unsigned long max_util, unsigned long sum_util);

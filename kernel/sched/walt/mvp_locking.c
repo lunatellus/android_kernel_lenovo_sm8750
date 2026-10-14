@@ -18,6 +18,9 @@ static void android_vh_alter_mutex_list_add(void *unused, struct mutex *lock,
 	struct list_head *head = list;
 	struct walt_task_struct *wts;
 
+	if (*already_on_list)
+		return;
+
 	if (unlikely(walt_disabled))
 		return;
 

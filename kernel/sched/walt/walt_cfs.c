@@ -1573,6 +1573,12 @@ static void walt_cfs_replace_next_task_fair(void *unused, struct rq *rq, struct 
 
 	if (walt_quiet_state)
 		return;
+	/* ACK removed repick; honor the UX task chosen by the earlier Lenovo hook. */
+	if (lenovo_hyper_task_selected(rq, *p)) {
+		wrq->mvp_arrival_time = 0;
+		return;
+	}
+
 
 	get_entry_instr(REPLACE_NEXT_TASK_FAIR);
 	if ((*p) && (*p) != prev && ((((*p)->on_cpu == 1) && task_current_donor(rq, *p)) ||

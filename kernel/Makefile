@@ -5,6 +5,7 @@ ccflags-y += -I$(src)
 # Subdirectories
 obj-y += locking/
 obj-y += rcu/
+obj-y += sched/lenovohypersched/
 obj-y += sched/walt/
 obj-y += trace/
 
