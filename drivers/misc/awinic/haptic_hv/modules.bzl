@@ -14,7 +14,7 @@ def register_modules(registry):
             "drivers/misc/awinic/haptic_hv/haptic_hv.c",
             "drivers/misc/awinic/haptic_hv/haptic_hv.h",
             "drivers/misc/awinic/haptic_hv/haptic_hv_reg.h",
-            "drivers/misc/awinic/haptic_hv/haptic_rtp_names.inc",
+            "drivers/misc/awinic/haptic_hv/haptic_rtp_names.h",
         ],
         copts = ["-DAW_DOUBLE", "-Wno-error=unused-result"],
         deps = ["drivers/misc/hq/hq_kallsyms/hq_kallsyms"],

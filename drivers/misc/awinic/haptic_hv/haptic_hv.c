@@ -22,7 +22,7 @@
 #define HAPTIC_HV_DRIVER_VERSION	"v1.6.0.1"
 
 char *aw_ram_name = "haptic_ram.bin";
-#include "haptic_rtp_names.inc"
+#include "haptic_rtp_names.h"
 
 #ifdef AW_TIKTAP
 static struct aw_haptic *g_aw_haptic;
