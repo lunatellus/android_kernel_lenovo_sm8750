@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config HQ_USBNET
+	tristate "Huaqin USB networking framework"
+	depends on USB_USBNET
+	select HQ_MII
+	help
+	  Huaqin copy of the usbnet framework used by the Lenovo smsc95xx
+	  driver. The module is called hq_usbnet.
+
+config USB_NET_SMSC95XX
+	tristate "SMSC LAN95XX based USB 2.0 10/100 ethernet devices"
+	depends on USB_USBNET && HQ_USBNET && HQ_KALLSYMS
+	select PHYLIB
+	select HQ_SMSC_PHY
+	select BITREVERSE
+	select CRC16
+	select CRC32
+	imply NET_SELFTESTS
+	help
+	  Lenovo Huaqin variant of the SMSC LAN95XX USB Ethernet driver.
+	  Uses hq_usbnet, hq_mii and hq_smsc with the stock module names.

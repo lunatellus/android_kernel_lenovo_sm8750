@@ -9,3 +9,11 @@ config DP83867_PHY
 	tristate "Texas Instruments DP83867 Gigabit PHY"
 	help
 	  Currently supports the DP83867 PHY.
+
+config HQ_SMSC_PHY
+	tristate "Huaqin SMSC PHYs"
+	depends on PHYLIB
+	select CRC16
+	help
+	  Huaqin copy of the SMSC PHY driver used by the Lenovo smsc95xx
+	  driver. The module is called hq_smsc.

@@ -46,9 +46,13 @@ menuconfig NETDEVICES
 
 if NETDEVICES
 
+config HQ_MII
+	tristate
+
 source "$(KCONFIG_EXT_PREFIX)drivers/net/pcs/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/net/ethernet/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/net/phy/Kconfig"
 source "$(KCONFIG_EXT_PREFIX)drivers/net/mdio_fe/Kconfig"
+source "$(KCONFIG_EXT_PREFIX)drivers/net/usb/Kconfig"
 
 endif # NETDEVICES
