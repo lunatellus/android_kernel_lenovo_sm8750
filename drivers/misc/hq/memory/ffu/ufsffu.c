@@ -103,7 +103,7 @@ int build_ffu_update_list(struct ufs_hba *hba,
 	struct device *dev = hba->dev;
 	char *value;
 	size_t len;
-	int list_count = 0, skip, field, ret;
+	int list_count = 0, alloc_count, skip, field, ret;
 
 	ret = request_firmware(&cfg_entry, FFU_CONFIG, dev);
 	if (!ret)
@@ -144,7 +144,8 @@ config_loaded:
 empty_list:
 		*need_update = (struct fw_update_checklist *)&need_update_k;
 	} else {
-		*need_update = kmalloc(list_count * sizeof(**need_update), GFP_KERNEL);
+		alloc_count = list_count;
+		*need_update = kmalloc(alloc_count * sizeof(**need_update), GFP_KERNEL);
 		if (IS_ERR_OR_NULL(*need_update)) {
 			pr_err("ufs_ffu: kmalloc error!\n");
 			list_count = 0;
@@ -156,7 +157,12 @@ empty_list:
 		record = NULL;
 		record = strsep(&config_data, "\n");
 		list_count = 0;
-		while (record && *record) {
+		/*
+		 * The first pass only counts records naming this product, but
+		 * every record from the same vendor is parsed into the next slot.
+		 * Stop once the allocation is full instead of writing past it.
+		 */
+		while (record && *record && list_count < alloc_count) {
 			value = strsep(&record, " ");
 			if (!value)
 				goto next_record;
@@ -169,7 +175,7 @@ empty_list:
 					  field, value, list_count);
 				switch (field) {
 				case 0:
-					len = strlen(value);
+					len = min(strlen(value), FFU_VENDOR_LEN - 1);
 					if (strncmp(value, device->vendor_id, len)) {
 						pr_notice("ufs_ffu: not %s vendor_id, skip!",
 							  value);
@@ -180,7 +186,7 @@ empty_list:
 					memcpy(((*need_update) + list_count)->vendor_id, value, len);
 					break;
 				case 1:
-					len = strlen(value);
+					len = min(strlen(value), FFU_PRODUCT_LEN - 1);
 					if (strncmp(value, device->product_id, len)) {
 						pr_notice("ufs_ffu: not %s product_id, skip!",
 							  value);
@@ -191,17 +197,17 @@ empty_list:
 					memcpy(((*need_update) + list_count)->product_id, value, len);
 					break;
 				case 2:
-					len = strlen(value);
+					len = min(strlen(value), FFU_REV_LEN - 1);
 #line 323 "drivers/misc/hq/memory/ffu/ufsffu.c"
 					memcpy(((*need_update) + list_count)->product_rev_from, value, len);
 					break;
 				case 3:
-					len = strlen(value);
+					len = min(strlen(value), FFU_REV_LEN - 1);
 #line 327 "drivers/misc/hq/memory/ffu/ufsffu.c"
 					memcpy(((*need_update) + list_count)->product_rev_to, value, len);
 					break;
 				case 4:
-					len = strlen(value);
+					len = min(strlen(value), FFU_NAME_LEN - 1);
 #line 331 "drivers/misc/hq/memory/ffu/ufsffu.c"
 					memcpy(((*need_update) + list_count)->firmware_name, value, len);
 					ret = request_firmware(&ufs_firmware, value, dev);
