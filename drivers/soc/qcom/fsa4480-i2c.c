@@ -409,7 +409,7 @@ int fsa4480_reg_notifier(struct notifier_block *nb,
 	} else if (atomic_read(&(fsa_priv->usbc_mode)) == TYPEC_ACCESSORY_AUDIO) {
 		dev_dbg(fsa_priv->dev, "%s: analog adapter already inserted\n",
 			__func__);
-		rc = fsa4480_usbc_analog_setup_switches(fsa_priv);
+		rc = fsa4480_dual_analog_setup_switches(fsa_priv);
 	}
 
 	return rc;
@@ -517,7 +517,10 @@ static void fsa4480_usbc_analog_work_fn(struct work_struct *work)
 		pr_err("%s: fsa container invalid\n", __func__);
 		return;
 	}
-	fsa4480_usbc_analog_setup_switches(fsa_priv);
+	if (fsa_priv->use_powersupply)
+		fsa4480_usbc_analog_setup_switches(fsa_priv);
+	else
+		fsa4480_dual_analog_setup_switches(fsa_priv);
 	pm_relax(fsa_priv->dev);
 }
 
@@ -675,6 +678,12 @@ static int fsa4480_probe(struct i2c_client *i2c)
 	mutex_init(&fsa_priv->notification_lock);
 	i2c_set_clientdata(i2c, fsa_priv);
 
+	rc = sysfs_create_group(&i2c->dev.kobj, &fsa4480_attribute_group);
+	if (rc < 0)
+		dev_err(fsa_priv->dev, "error creating sysfs attr files\n");
+	audio_4480_priv1 = fsa_priv;
+	rc = 0;
+
 	INIT_WORK(&fsa_priv->usbc_analog_work,
 		  fsa4480_usbc_analog_work_fn);
 
@@ -695,6 +704,8 @@ static void fsa4480_remove(struct i2c_client *i2c)
 
 	if (!fsa_priv)
 		return;
+	audio_4480_priv1 = NULL;
+	sysfs_remove_group(&i2c->dev.kobj, &fsa4480_attribute_group);
 	if (fsa_priv->use_powersupply) {
 		/* deregister from PMI */
 		power_supply_unreg_notifier(&fsa_priv->nb);
