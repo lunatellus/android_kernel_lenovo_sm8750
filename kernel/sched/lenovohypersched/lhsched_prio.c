@@ -134,24 +134,32 @@ out:
 	raw_spin_unlock_irqrestore(&lda->lock, flags);
 }
 
-void set_cgroup_hyper_prio(struct task_struct *p)
+/* Lenovo cpu-cgroup priority, kept in reserved task_group slot 1
+ * (6.12 spells the padding __kabi_reserved1, 6.6 android_kabi_reserved1).
+ */
+u32 cgroup_hyper_prio(struct task_struct *p)
 {
 	struct cgroup_subsys_state *css;
 	u32 prio = 0;
+
+	rcu_read_lock();
+	css = task_css(p, cpu_cgrp_id);
+	if (css)
+		prio = (u32)css_tg(css)->__kabi_reserved1;
+	rcu_read_unlock();
+	return prio;
+}
+
+void set_cgroup_hyper_prio(struct task_struct *p)
+{
+	u32 prio;
 	struct lenovo_task_struct *lt;
 	struct lenovo_dynamic_attribute *lda;
 
 	if (!p)
 		return;
 
-	/* Keep the Lenovo cpu-cgroup priority in reserved task_group slot 1
-	 * (6.12 spells the padding __kabi_reserved1, 6.6 android_kabi_reserved1).
-	 */
-	rcu_read_lock();
-	css = task_css(p, cpu_cgrp_id);
-	if (css)
-		prio = (u32)css_tg(css)->__kabi_reserved1;
-	rcu_read_unlock();
+	prio = cgroup_hyper_prio(p);
 
 	lt = LENOVO_TASK(p);
 	if (!lt)

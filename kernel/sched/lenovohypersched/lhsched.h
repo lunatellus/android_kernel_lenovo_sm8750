@@ -74,6 +74,7 @@ struct lenovo_dynamic_attribute {
 	u64 dyn_switched_flag;
 	int normal_hyper_ux_prio;
 	struct work_struct sleeping_reset_work;
+	struct work_struct cgroup_prio_work;
 	u8 hyper_ux_boost[5];
 	struct lenovo_task_struct *ltsk;
 };
@@ -195,6 +196,7 @@ void request_hyper_boost(struct task_struct *p, struct lenovo_dynamic_attribute 
 			 u32 prio, u32 type);
 void clear_hyper_boost(struct task_struct *p, struct lenovo_dynamic_attribute *lda,
 		       u32 type);
+u32 cgroup_hyper_prio(struct task_struct *p);
 void set_cgroup_hyper_prio(struct task_struct *p);
 void dynamic_prio_clear(void *ltsk);
 void queue_hyper_prio_work(struct task_struct *p);

@@ -10,6 +10,7 @@
 
 
 static void sleeping_reset_func(struct work_struct *work);
+static void cgroup_prio_func(struct work_struct *work);
 
 
 
@@ -141,6 +142,7 @@ int init_lenovo_dynamic_task_struct(void *ltsk)
 	lda->saved_policy = 0xbbad;
 
 	INIT_WORK(&lda->sleeping_reset_work, sleeping_reset_func);
+	INIT_WORK(&lda->cgroup_prio_work, cgroup_prio_func);
 	lda->ltsk = lt;
 
 	lda->dyn_switched_flag = 0;
@@ -163,19 +165,44 @@ static void sleeping_reset_func(struct work_struct *work)
 		restore_sched_attr_impl(p);
 	}
 	raw_spin_unlock(&lda->lock);
+	put_task_struct(p);
+}
+
+static void cgroup_prio_func(struct work_struct *work)
+{
+	struct lenovo_dynamic_attribute *lda =
+		container_of(work, struct lenovo_dynamic_attribute, cgroup_prio_work);
+	struct task_struct *p = lenovo_task_owner(lda->ltsk);
+
 	set_cgroup_hyper_prio(p);
 	put_task_struct(p);
 }
 
+/*
+ * Stock applies the cgroup priority directly from the wakeup hooks. On 6.12
+ * try_to_wake_up holds p->pi_lock there and sched_setattr_nocheck takes it
+ * again, so the change is deferred to a work item. Only queue it when the
+ * priority actually differs, and never for workqueue workers: kick_pool()
+ * wakes them under pool->lock, and queueing from that wakeup re-enters
+ * __queue_work on the same pool and deadlocks the CPU.
+ */
 void queue_hyper_prio_work(struct task_struct *p)
 {
 	struct lenovo_dynamic_attribute *lda = LENOVO_TASK(p)->lda;
+	u32 prio, cur;
 
-	if (!lda)
+	if (!lda || (p->flags & PF_WQ_WORKER))
 		return;
 
-	/* Wakeup hooks hold p->pi_lock; sched_setattr_nocheck must run outside it. */
+	prio = cgroup_hyper_prio(p);
+	cur = lda->hyper_ux_boost[4];
+	if (prio == cur)
+		return;
+	/* Raising is refused by request_hyper_boost(); don't requeue forever. */
+	if (prio > cur && (prio > 10 || p->rt_priority > 10))
+		return;
+
 	get_task_struct(p);
-	if (!schedule_work(&lda->sleeping_reset_work))
+	if (!schedule_work(&lda->cgroup_prio_work))
 		put_task_struct(p);
 }
