@@ -39,6 +39,7 @@ def register_modules(registry):
             "drivers/virt/gunyah/gh_dbl",
             "arch/arm64/gunyah/gh_arm_drv",
             "drivers/regulator/debug-regulator",
+            "drivers/misc/hq/hqsysfs/hqsysfs",
         ],
     )
 
