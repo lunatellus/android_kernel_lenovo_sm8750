@@ -71,6 +71,9 @@ def define_techpack_modules(target, msm_target, variant):
         techpack_targets += [
             "//{}/st/opensource/driver:{}_stm_nfc_i2c".format(SOC_MODULES_REPO_PATH, target),
             "//{}/st/opensource/eSE-driver:{}_stm_st54se_gpio".format(SOC_MODULES_REPO_PATH, target),
+            # elden carries a peach WLAN chip and stock loads both the v1 and
+            # v2 drivers; cnss2 binds the one matching the enumerated silicon.
+            "//{}/qcom/opensource/wlan/qcacld-3.0:{}_qca_cld_peach".format(SOC_MODULES_REPO_PATH, target),
         ]
         # Stock elden vendor_dlkm has no msm_hfi_core.ko and neither
         # msm-eva.ko nor msm_video.ko depends on it.
