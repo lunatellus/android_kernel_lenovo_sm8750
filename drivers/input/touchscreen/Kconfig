@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Input misc drivers configuration
+#
+
+config TOUCHSCREEN_CAP1296
+        tristate "touch driver for cap1296"
+        help
+          The CAP1296 is a multiple channel capacitive touch
+          sensor controller. It contains six (6) individual capaci-
+          tive touch sensor inputs with programmable sensitivity
+          for use in touch sensor applications.
+

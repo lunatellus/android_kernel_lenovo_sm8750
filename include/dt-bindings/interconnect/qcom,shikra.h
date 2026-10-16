@@ -1,0 +1,115 @@
+/* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
+/*
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ */
+
+#ifndef __DT_BINDINGS_INTERCONNECT_QCOM_SHIKRA_H
+#define __DT_BINDINGS_INTERCONNECT_QCOM_SHIKRA_H
+
+#define MASTER_QUP_CORE_0			0
+#define SNOC_CNOC_MAS				1
+#define MASTER_QDSS_DAP				2
+#define MASTER_LLCC				3
+#define MASTER_GRAPHICS_3D			4
+#define MASTER_MNOC_HF_MEM_NOC			5
+#define MASTER_ANOC_PCIE_MEM_NOC		6
+#define MASTER_SNOC_SF_MEM_NOC			7
+#define MASTER_AMPSS_M0				8
+#define MASTER_SYS_TCU				9
+#define MASTER_CAMNOC_SF			10
+#define MASTER_VIDEO_P0				11
+#define MASTER_VIDEO_PROC			12
+#define MASTER_CAMNOC_HF			13
+#define MASTER_MDP_PORT0			14
+#define MASTER_MMRT_VIRT			15
+#define MASTER_SNOC_CFG				16
+#define MASTER_TIC				17
+#define MASTER_ANOC_SNOC			18
+#define MASTER_MEMNOC_PCIE			19
+#define MASTER_MEMNOC_SNOC			20
+#define MASTER_PIMEM				21
+#define MASTER_PCIE2_0				22
+#define MASTER_QDSS_BAM				23
+#define MASTER_QPIC				24
+#define MASTER_QUP_0				25
+#define CNOC_SNOC_MAS				26
+#define MASTER_AUDIO				27
+#define MASTER_EMAC_0				28
+#define MASTER_EMAC_1				29
+#define MASTER_QDSS_ETR				30
+#define MASTER_SDCC_1				31
+#define MASTER_SDCC_2				32
+#define MASTER_USB2_0				33
+#define MASTER_USB3				34
+#define MASTER_CRYPTO_CORE0			35
+#define SLAVE_QUP_CORE_0			512
+#define SLAVE_AHB2PHY_USB			513
+#define SLAVE_APSS_THROTTLE_CFG			514
+#define SLAVE_AUDIO				515
+#define SLAVE_BOOT_ROM				516
+#define SLAVE_CAMERA_NRT_THROTTLE_CFG		517
+#define SLAVE_CAMERA_CFG			518
+#define SLAVE_CDSP_THROTTLE_CFG			519
+#define SLAVE_CLK_CTL				520
+#define SLAVE_DSP_CFG				521
+#define SLAVE_RBCPR_CX_CFG			522
+#define SLAVE_RBCPR_MX_CFG			523
+#define SLAVE_CRYPTO_0_CFG			524
+#define SLAVE_DDR_SS_CFG			525
+#define SLAVE_DISPLAY_CFG			526
+#define SLAVE_EMAC0_CFG				527
+#define SLAVE_EMAC1_CFG				528
+#define SLAVE_GPU_CFG				529
+#define SLAVE_GPU_THROTTLE_CFG			530
+#define SLAVE_HWKM				531
+#define SLAVE_IMEM_CFG				532
+#define SLAVE_MAPSS				533
+#define SLAVE_MDSP_MPU_CFG			534
+#define SLAVE_MESSAGE_RAM			535
+#define SLAVE_MSS				536
+#define SLAVE_PCIE_CFG				537
+#define SLAVE_PDM				538
+#define SLAVE_PIMEM_CFG				539
+#define SLAVE_PKA_WRAPPER_CFG			540
+#define SLAVE_PMIC_ARB				541
+#define SLAVE_QDSS_CFG				542
+#define SLAVE_QM_CFG				543
+#define SLAVE_QM_MPU_CFG			544
+#define SLAVE_QPIC				545
+#define SLAVE_QUP_0				546
+#define SLAVE_RPM				547
+#define SLAVE_SDCC_1				548
+#define SLAVE_SDCC_2				549
+#define SLAVE_SECURITY				550
+#define SLAVE_SNOC_CFG				551
+#define SNOC_SF_THROTTLE_CFG			552
+#define SLAVE_TLMM				553
+#define SLAVE_TSCSS				554
+#define SLAVE_USB2				555
+#define SLAVE_USB3				556
+#define SLAVE_VENUS_CFG				557
+#define SLAVE_VENUS_THROTTLE_CFG		558
+#define SLAVE_VSENSE_CTRL_CFG			559
+#define SLAVE_SERVICE_CNOC			560
+#define SLAVE_EBI_CH0				561
+#define SLAVE_LLCC				562
+#define SLAVE_MEMNOC_SNOC			563
+#define SLAVE_MEM_NOC_PCIE_SNOC			564
+#define SLAVE_MMNRT_VIRT			565
+#define SLAVE_MM_MEMNOC				566
+#define SLAVE_APPSS				567
+#define SLAVE_MCUSS				568
+#define SLAVE_WCSS				569
+#define SLAVE_MEMNOC_SF				570
+#define SNOC_CNOC_SLV				571
+#define SLAVE_BOOTIMEM				572
+#define SLAVE_OCIMEM				573
+#define SLAVE_PIMEM				574
+#define SLAVE_SERVICE_SNOC			575
+#define SLAVE_PCIE2_0				576
+#define SLAVE_QDSS_STM				577
+#define SLAVE_TCU				578
+#define SLAVE_PCIE_MEMNOC			579
+#define SLAVE_ANOC_SNOC				580
+
+#endif

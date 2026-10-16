@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Storage
+
+POCs:
+  Bao D. Nguyen
+  Richard Patrick
+
+DRIVERS:
+  UFS
+  MMC
+
+PATHS:
+drivers/ufs/
+drivers/scsi/
+drivers/mmc/

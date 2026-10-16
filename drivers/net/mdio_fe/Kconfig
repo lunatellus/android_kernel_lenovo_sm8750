@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config EMAC_MDIO_FE
+       tristate "Support for the mdio front end driver"
+       help
+         Adding support for EMAC MDIO Front end driver. This enables single
+         mdio for the dual mac feature support on HQX. The front end driver
+         get request from GVM and send it to the Backend mdio driver.The
+         request is handled on the backend for the mdio read/write operation.
+

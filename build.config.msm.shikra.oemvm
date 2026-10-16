@@ -1,0 +1,11 @@
+################################################################################
+## Inheriting MSM configs
+. "${KERNEL_DIR}"/build.config.msm.shikra.vm
+################################################################################
+## Setting parameter to build only OEMVM images
+
+MKDTIMGDTBS=()
+MKDTIMGDTBS["shikra_oemvm"]="shikra-oemvm"
+
+################################################################################
+

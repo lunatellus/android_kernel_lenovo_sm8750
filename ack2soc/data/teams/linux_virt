@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Virt
+
+POCs:
+  Murali Nalajala
+  Prakruthi Deepak Heragu
+
+DRIVERS:
+  Virt
+  Gunyah
+
+PATHS:
+drivers/virtio/virtio_mmio.c
+drivers/block/virtio_blk.c

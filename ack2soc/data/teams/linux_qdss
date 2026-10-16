@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux QDSS
+
+POCs:
+  Jinlong Mao
+  Yuanfang Zhang
+
+DRIVERS:
+  Coresight
+
+PATHS:
+drivers/hwtracing/
+include/linux/coresight.h

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Thermal
+
+POCs:
+  Manaf Meethalavalappu Pallikunhi
+  Suresh Shenoy
+
+DRIVERS:
+  Thermal
+
+PATHS:
+drivers/thermal/

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Audio
+
+POCs:
+  Patrick Lai
+
+DRIVERS:
+  Audio Codecs
+
+PATHS:
+sound/soc/codecs/hdmi-codec.c

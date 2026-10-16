@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Memory
+
+POCs:
+  Sukadev Bhattiprolu
+  Patrick Daly
+  Oreoluwa Babatunde
+  Sudarshan Rajagopalan
+
+DRIVERS:
+  Memory
+  IOMMU
+
+PATHS:
+drivers/iommu/
+mm/
+include/linux/iommu-dma.h
+drivers/block/zram/
+drivers/virtio/virtio_mem.c
+include/linux/zsmalloc.h
+include/linux/adreno-smmu-priv.h

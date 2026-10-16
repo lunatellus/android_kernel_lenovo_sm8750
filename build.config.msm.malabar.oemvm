@@ -1,0 +1,10 @@
+################################################################################
+## Inheriting MSM configs
+. "${KERNEL_DIR}"/build.config.msm.malabar.vm
+################################################################################
+## Setting parameter to build only OEMVM images
+
+MKDTIMGDTBS=()
+MKDTIMGDTBS["malabar_oemvm"]="malabar-oemvm"
+
+################################################################################

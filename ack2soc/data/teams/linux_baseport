@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Baseport
+
+POCs:
+  Satya Durga Srinivasu Prabhala
+  Melody Olvera
+  Gokul krishna Krishnakumar
+  Unnathi Chalicheemala
+  Francisco Munoz Ruiz
+
+DRIVERS:
+  SCM
+  Pinctrl
+  LLCC
+  IPCC
+  Remoteproc
+
+PATHS:
+drivers/soc/qcom/mdt_loader.c
+drivers/soc/qcom/qcom_pd_mapper.c
+drivers/soc/qcom/socinfo.c
+drivers/soc/qcom/llcc-qcom.c
+drivers/soc/qcom/qcom_pdr_msg.c
+drivers/soc/qcom/pdr_interface.c
+drivers/pinctrl/qcom/pinctrl-msm.c
+drivers/mailbox/qcom-ipcc.c
+drivers/remoteproc/
+drivers/power/reset/reboot-mode.c
+drivers/edac/qcom_edac.c
+drivers/firmware/qcom/qcom_scm.c
+drivers/firmware/qcom/qcom_scm-legacy.c
+drivers/firmware/qcom/qcom_scm-smc.c
+drivers/misc/lkdtm/
+drivers/nvmem/qfprom.c
+scripts/
+kernel/locking/locktorture.c
+kernel/torture.c
+kernel/rcu/rcutorture.c
+lib/atomic64_test.c
+drivers/soc/qcom/pdr_internal.h
+drivers/misc/lkdtm/lkdtm.h
+drivers/pinctrl/qcom/pinctrl-msm.h
+drivers/firmware/qcom/qcom_scm.h
+include/linux/soc/qcom/llcc-qcom.h
+include/linux/soc/qcom/pdr.h
+include/linux/soc/qcom/socinfo.h
+include/linux/soc/qcom/mdt_loader.h
+include/linux/remoteproc/qcom_rproc.h
+include/linux/firmware/qcom/qcom_scm.h
+include/dt-bindings/mailbox/qcom-ipcc.h
+include/dt-bindings/arm/qcom,ids.h
+Makefile
+init/Kconfig

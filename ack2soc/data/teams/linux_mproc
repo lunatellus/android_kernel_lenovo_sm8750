@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Mproc
+
+POCs:
+  Chris Lew
+  linux.mproc.mandatory.reviewers
+
+DRIVERS:
+  MPROC
+
+PATHS:
+drivers/soc/qcom/smp2p.c
+drivers/soc/qcom/smem.c
+drivers/soc/qcom/qcom_aoss.c
+drivers/soc/qcom/qmi_interface.c
+drivers/soc/qcom/qmi_encdec.c
+drivers/rpmsg/
+net/qrtr/
+drivers/hwspinlock/qcom_hwspinlock.c
+drivers/hwmon/hwmon.c
+include/linux/soc/qcom/smem.h
+include/linux/soc/qcom/qmi.h
+include/linux/rpmsg/qcom_glink.h
+include/uapi/linux/qrtr.h

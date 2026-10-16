@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  SSG
+
+POCs:
+  Sonal Gupta
+  Gaurav Kashyap
+
+DRIVERS:
+  SHM Bridge
+  Crypto
+
+PATHS:
+drivers/soc/qcom/ice.c
+drivers/crypto/qcom-rng.c
+drivers/firmware/qcom/qcom_tzmem.c
+drivers/firmware/qcom/qcom_tzmem.h
+include/linux/firmware/qcom/qcom_tzmem.h
+include/soc/qcom/ice.h

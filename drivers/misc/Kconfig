@@ -1,0 +1,105 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Misc strange devices
+#
+
+menu "Misc devices"
+
+config QCOM_COINCELL
+	tristate "Qualcomm coincell charger support"
+	depends on MFD_SPMI_PMIC || COMPILE_TEST
+	help
+	  This driver supports the coincell block found inside of
+	  Qualcomm PMICs.  The coincell charger provides a means to
+	  charge a coincell battery or backup capacitor which is used
+	  to maintain PMIC register and RTC state in the absence of
+	  external power.
+
+config QSEECOM_PROXY
+	tristate "To enable qseecom proxy driver for kernel client"
+	help
+	 qseecom proxy driver serves the kernel clients by providing
+	 required ops via call back functions with a minimal framework.
+	 These callback functions can be used to start, shutdown and
+	 send commands to the trusted apps.
+
+config BOOTMARKER_PROXY
+	tristate "To enable Bootmarker proxy driver for kernel client"
+	help
+	  Bootmarker proxy driver serves the kernel clients by providing
+	  required ops via call back functions with a minimal framework.
+	  These callback functions can be used to access the place marker.
+	  To compile this driver as a module, choose M here.
+	  If unsure, say N.
+
+config LKDTM
+	tristate "Linux Kernel Dump Test Tool Module"
+	depends on DEBUG_FS
+	help
+	This module enables testing of the different dumping mechanisms by
+	inducing system failures at predefined crash points.
+	If you don't need it: say N
+	Choose M here to compile this code as a module. The module will be
+	called lkdtm.
+
+	Documentation on how to use the module can be found in
+	Documentation/fault-injection/provoke-crashes.rst
+
+config ISL97900_LED
+	tristate "ISL97900_I2C_Driver"
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Support for ISL97900 LED driver IC, using this driver,
+	  user can set different values to control the LED current
+	  using I2C.
+
+	  Say Y if you want to enable ISL97900 driver.
+
+
+config QTI_FASTRPC
+	tristate "Qualcomm FastRPC"
+	depends on ARCH_QCOM || COMPILE_TEST
+	depends on RPMSG
+	select QCOM_SCM
+	select DMA_SHARED_BUFFER
+	help
+	  Provides a communication mechanism that allows for clients to
+	  make remote method invocations across processor boundary to
+	  applications DSP processor. Say M if you want to enable this
+	  module.
+
+config TPS6286_STEP_DOWN_CONV
+	tristate "TPS6286_I2C_Driver"
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Support for TPS6286 synchronous Step-Down Converter with I2C
+	  interface. User can set different output voltage presets using
+	  I2C and Ramp speed.
+
+	  Say Y if you want to enable TPS6286 driver.
+
+config INA234_CURRENT_MONITOR
+        tristate "INA234_I2C_Driver"
+        select REGMAP_I2C
+        depends on I2C
+        help
+          Support for INA234 Current Monitor driver IC, using this driver,
+          user can set different values to monitor voltage across an external
+          sense resistor and reports values for currrent, bus voltage and power
+          using I2C.
+
+          Say Y if you want to enable INA234 driver.
+
+config SLG4DC_SIGNAL_IC
+	tristate "SLG4DC_I2C_Driver"
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Support for SLG4DC49982 low power driver IC, using this driver,
+	  user can set different values to enable power from this small
+	  power device using I2C.
+
+	  Say Y if you want to enable SLG4DC driver.
+endmenu

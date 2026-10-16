@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Scheduler
+
+POCs:
+  Abhijeet Dharmapurikar
+  Sai Harshini Nimmala
+
+DRIVERS:
+  Scheduler
+
+PATHS:
+kernel/sched/
+include/linux/sched/

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# EXTCON drivers
+#
+# When adding new entries keep the list in alphabetical order
+
+config EXTCON_QTI_SPMI_MISC
+	tristate "Qualcomm USB extcon support"
+	depends on ARCH_QCOM || COMPILE_TEST
+	help
+	  Say Y here to enable SPMI PMIC based USB cable detection
+	  support on Qualcomm PMICs such as PM8941.
+
+	  This driver provides USB ID and VBUS detection support through
+	  the extcon framework. It handles USB host/device role switching
+	  by monitoring the USB ID pin and VBUS line states.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called extcon-qti-spmi-misc.
+
+config EXTCON_USB_GPIO
+	tristate "USB GPIO extcon support"
+	depends on GPIOLIB || COMPILE_TEST
+	help
+	  Say Y here to enable GPIO based USB cable detection extcon support.
+	  Used typically if GPIO is used for USB ID pin detection.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called extcon-qti-spmi-misc.

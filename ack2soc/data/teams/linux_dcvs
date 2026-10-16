@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux DCVS
+
+POCs:
+  Amir Vajid
+  linux.dcvs
+
+DRIVERS:
+  DCVS
+  SCMI
+
+PATHS:
+drivers/soc/qcom/dcvs/memlat.c

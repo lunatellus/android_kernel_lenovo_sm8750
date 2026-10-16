@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Traffic control configuration.
+#
+
+menu "NET_SCHED"
+
+config NET_SCH_MQPRIO
+	tristate "Multi-queue priority scheduler (MQPRIO)"
+	help
+	  Say Y here if you want to use the Multi-queue Priority scheduler.
+	  This scheduler allows QOS to be offloaded on NICs that have support
+	  for offloading QOS schedulers.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called sch_mqprio.
+
+	  If unsure, say N
+
+config NET_SCH_CBS
+	tristate "Credit Based Shaper (CBS)"
+	help
+	  Say Y here if you want to use the Credit Based Shaper (CBS) packet
+	  scheduling algorithm.
+
+	  See the top of <file:net/sched/sch_cbs.c> for more details.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_cbs.
+
+config NET_CLS_FLOWER
+	tristate "Flower classifier"
+	select NET_CLS
+	help
+	  If you say Y here, you will be able to classify packets based on
+	  a configurable combination of packet keys and masks.
+
+	  To compile this code as a module, choose M here: the module will
+	  be called cls_flower.
+
+config NET_SCH_ETF
+	tristate "Earliest TxTime First (ETF)"
+	help
+	  Say Y here if you want to use the Earliest TxTime First (ETF) packet
+	  scheduling algorithm.
+
+	  See the top of <file:net/sched/sch_etf.c> for more details.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_etf.
+
+config NET_ACT_GACT
+	tristate "Generic actions"
+	depends on NET_CLS_ACT
+	help
+	  Say Y here to take generic actions such as dropping and
+	  accepting packets.
+
+	  To compile this code as a module, choose M here: the
+	  module will be called act_gact.
+
+config NET_SCH_INGRESS
+	tristate "Ingress/classifier-action Qdisc"
+	depends on NET_CLS_ACT
+	select NET_XGRESS
+	help
+	  Say Y here if you want to use classifiers for incoming and/or outgoing
+	  packets. This qdisc doesn't do anything else besides running classifiers,
+	  which can also have actions attached to them. In case of outgoing packets,
+	  classifiers that this qdisc holds are executed in the transmit path
+	  before real enqueuing to an egress qdisc happens.
+
+	  If unsure, say Y.
+
+	  To compile this code as a module, choose M here: the module will be
+	  called sch_ingress with alias of sch_clsact.
+
+endmenu

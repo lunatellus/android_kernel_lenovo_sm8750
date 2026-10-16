@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux Clocks
+
+POCs:
+  Mike Tipton
+  Vivek Aknurwar
+
+DRIVERS:
+  Clocks
+  Interconnects
+
+PATHS:
+drivers/clk/
+drivers/interconnect/
+drivers/cpufreq/qcom-cpufreq-hw.c
+drivers/clk/clk-scmi.c
+include/linux/clk/qcom.h
+include/dt-bindings/clock/

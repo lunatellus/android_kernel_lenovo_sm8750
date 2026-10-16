@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0
+
+menu "Layout Types"
+
+config NVMEM_LAYOUT_QCOM_ETH_MAC
+	tristate "Qualcomm Ethernet MAC address layout"
+	depends on OF
+	help
+	  Handles the non-contiguous eFuse storage of eth MAC byte[5]
+	  on Qualcomm SoC. Provides transparent post-processing for
+	  the ethx-mac nvmem cell.
+
+	  Say Y if you use the SA8797P SoC with Ethernet.
+
+endmenu

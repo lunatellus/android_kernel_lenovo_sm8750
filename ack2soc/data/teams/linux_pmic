@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux PMIC
+
+POCs:
+  Subbaraman Narayanamurthy
+  David Collins
+
+DRIVERS:
+  PMIC
+  Regulators
+  SPMI
+
+PATHS:
+drivers/mfd/qcom-spmi-pmic.c
+drivers/pinctrl/qcom/pinctrl-spmi-mpp.c
+drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+drivers/input/misc/pm8941-pwrkey.c
+drivers/nvmem/qcom-spmi-sdam.c
+drivers/leds/flash/leds-qcom-flash.c
+drivers/leds/rgb/leds-qcom-lpg.c
+drivers/power/reset/qcom-pon.c
+drivers/iio/adc/qcom-spmi-adc5.c
+drivers/iio/adc/qcom-vadc-common.c
+drivers/spmi/spmi-pmic-arb.c
+include/linux/iio/adc/qcom-vadc-common.h
+include/dt-bindings/iio/

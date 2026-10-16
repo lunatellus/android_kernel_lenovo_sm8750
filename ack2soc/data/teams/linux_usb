@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  Linux USB
+
+POCs:
+  Wesley Cheng
+  Elson Serrao
+
+DRIVERS:
+  USB
+
+PATHS:
+drivers/usb/

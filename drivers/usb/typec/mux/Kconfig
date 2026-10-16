@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Type-C mux drivers
+#
+
+config TYPEC_MUX_PS883X
+	tristate "Parade PS883x Type-C retimer driver"
+	depends on I2C
+	depends on DRM || DRM=n
+	select DRM_AUX_BRIDGE if DRM_BRIDGE && OF
+	select REGMAP_I2C
+	help
+	  Say Y or M if your system has a Parade PS883x Type-C retimer chip
+	  found on some devices with a Type-C port.

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+
+TEAM:
+  WLAN
+
+POCs:
+  Rajeev Kumar
+  Ashish Malik
+  Vamsi Krishna
+  Veerendranath Jakkam
+
+DRIVERS:
+  mac80211
+  atheros
+
+PATHS:
+net/mac80211/
+drivers/net/wireless/ath/

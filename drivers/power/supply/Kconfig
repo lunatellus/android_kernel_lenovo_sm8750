@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: GPL-2.0-only
+if POWER_SUPPLY
+
+config QTI_BATTERY_CHARGER
+	tristate "QTI Glink battery charger"
+	depends on QTI_PMIC_GLINK && EXTCON && TYPEC
+	help
+	  Say Y here to enable Qualcomm Technologies, Inc. battery charger
+	  driver which interfaces with the charger firmware running on the
+	  remote subsystem (e.g. DSP) by communicating over PMIC Glink channel
+	  and provides information about the battery, USB and wireless charging
+	  by exposing them as power supply devices.
+
+	  To compile the driver as a module, choose M here: the module will be
+	  called qti_battery_charger.
+
+config CHARGER_QCOM_SMBB
+	tristate "Qualcomm Switch-Mode Battery Charger and Boost"
+	depends on MFD_SPMI_PMIC || COMPILE_TEST
+	depends on OF
+	depends on EXTCON
+	depends on REGULATOR
+	help
+	  Say Y to include support for the Switch-Mode Battery Charger and
+	  Boost (SMBB) hardware found in Qualcomm PM8941 PMICs.  The charger
+	  is an integrated, single-cell lithium-ion battery charger.  DT
+	  configuration is required for loading, see the devicetree
+	  documentation for more detail.  The base name for this driver is
+	  'pm8941_charger'.
+
+config BATTERY_MAX1720X
+	tristate "Maxim MAX17201/MAX17215 Fuel Gauge"
+	depends on I2C
+	select REGMAP_I2C
+	help
+	  MAX1720x is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment.
+
+	  Say Y here to enable support for the MAX17201/MAX17335 standalone
+	  battery gas-gauge.
+
+config QTI_CHARGER_NFC_VREG
+	bool "Allow client to vote on Charger reverse boost regulator"
+	depends on QTI_BATTERY_CHARGER
+	help
+	  Say 'y' here to allow client drivers to enable and perform voltage
+	  get/set operations via the regulator framework on the charger reverse
+	  boost regulator. This may be used by client drivers such as NFC
+	  to manage their power supply requirements through the charger’s
+	  reverse boost regulator.
+
+source "$(KCONFIG_EXT_PREFIX)drivers/power/supply/qcom/Kconfig"
+
+endif # POWER_SUPPLY

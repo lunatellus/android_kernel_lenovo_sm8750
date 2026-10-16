@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# This library does not depend on NEW_LEDS and must be independent so it can be
+# selected from other subsystems (specifically backlight).
+if NEW_LEDS
+
+comment "LED drivers"
+
+config LEDS_QTI_FLASH
+	tristate "Support for QTI Flash LEDs"
+	depends on LEDS_CLASS_FLASH
+	depends on MFD_SPMI_PMIC
+	select LEDS_TRIGGERS
+	help
+	  This driver supports flash LED peripheral that is present on
+	  some Qualcomm Technologies, Inc. PMICs (e.g. PM8350C).  It can
+	  configure the flash LED target current for several independent
+	  channels. It also supports various over current and over
+	  temperature mitigation features.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called leds-qti-flash.
+
+config LEDS_QPNP_VIBRATOR_LDO
+        tristate "Vibrator-LDO support for QPNP PMIC"
+        depends on LEDS_CLASS && MFD_SPMI_PMIC
+        help
+          This option enables device driver support for the vibrator-ldo
+          peripheral found on Qualcomm Technologies, Inc. QPNP PMICs.
+          The vibrator-ldo peripheral is capable of driving ERM vibrators.
+
+          To compile this driver as a module, choose M here: the module
+          will be called leds-qpnp-vibrator-ldo.
+
+config LEDS_AW2016
+	tristate "LED Support for AW2016"
+	depends on LEDS_CLASS && I2C
+	help
+	  this option enables support for the AW2016 RGB LED connected
+	  through I2C. Say Y to enable support for the AW2016 LED.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called leds-aw2016.
+
+config LEDS_USER_AW21104
+	tristate "LED Support for AW21104"
+	depends on LEDS_CLASS && I2C
+	help
+	  this option enables support for the AW21104 RGBW LED connected
+	  through I2C facing user(wearer) . Say Y to enable support for the AW21104 LED.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called leds-user-aw21104.
+
+config LEDS_BYS_AW21104
+	tristate "LED Support for AW21104"
+	depends on LEDS_CLASS && I2C
+	help
+	  this option enables support for the AW21104 RGBW LED connected
+	  through I2C facing bystander. Say Y to enable support for the AW21104 LED.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called leds-bys-aw21104.
+
+config LEDS_USER_LP5814
+	tristate "LED Support for LP5814"
+	depends on LEDS_CLASS && I2C
+	help
+	  this option enables support for the LP5814 RGBW LED connected
+	  through I2C facing user(wearer) . Say Y to enable support for the LP5814 LED.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called leds-user-lp5814.
+
+config LEDS_ETIRLED_LM3645
+	tristate "LED Support for LM3645"
+	depends on LEDS_CLASS && I2C
+	help
+	  this option enables support for the LM3645 IR LED connected
+	  through I2C for the ET camera sensor. Say Y to enable support for the LP5814 LED.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called leds-etirled-lm3645.
+
+endif # NEW_LEDS
