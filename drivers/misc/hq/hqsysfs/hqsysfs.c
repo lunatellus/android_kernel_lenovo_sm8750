@@ -240,7 +240,8 @@ static ssize_t huaqin_show(struct kobject *kobj, struct attribute *a,
 	} else if (hw->id == HWID_SDCARD_STATUS) {
 		return sprintf(buf, "%s\n", sdcard_state());
 	} else if (hw->id == HWID_THERMAL) {
-		char *tz_names = kstrdup(hw->dev_name, GFP_KERNEL);
+		char *tz_buf = kstrdup(hw->dev_name, GFP_KERNEL);
+		char *tz_names = tz_buf;
 		struct thermal_zone_device *tz;
 		char *zone_name;
 		int temp = 0;
@@ -257,8 +258,7 @@ static ssize_t huaqin_show(struct kobject *kobj, struct attribute *a,
 				zone_name = strsep(&tz_names, " ");
 			}
 		}
-		if (tz_names)
-			kfree(tz_names);
+		kfree(tz_buf);
 		return count;
 	}
 
