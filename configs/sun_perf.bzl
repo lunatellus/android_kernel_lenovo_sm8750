@@ -378,9 +378,8 @@ sun_perf_config = {
     "CONFIG_WFX": "n",
     "CONFIG_WILC1000_SDIO": "n",
     "CONFIG_WILC1000_SPI": "n",
-    "CONFIG_ZRAM": "m",
-    "CONFIG_ZRAM_BACKEND_ZSTD": "n",
-    "CONFIG_ZRAM_MULTI_COMP": "n",
-    "CONFIG_ZRAM_WRITEBACK": "n",
-    "CONFIG_ZSMALLOC": "m",
+    # elden ships the signed GKI zram/zsmalloc from system_dlkm like stock:
+    # the unsigned msm copy cannot import filp_open, so it has no writeback.
+    "CONFIG_ZRAM": "n",
+    "CONFIG_ZSMALLOC": "n",
 }

@@ -1,15 +1,5 @@
 # Add unprotected modules corresponding to each platform
 _unprotected_modules_map = {
-    "sun_consolidate": [
-        # keep sorted
-        "drivers/block/zram/zram.ko",
-        "mm/zsmalloc.ko",
-    ],
-    "sun_perf": [
-        # keep sorted
-        "drivers/block/zram/zram.ko",
-        "mm/zsmalloc.ko",
-    ],
     "canoe_consolidate": [
         # keep sorted
         "drivers/block/zram/zram.ko",
