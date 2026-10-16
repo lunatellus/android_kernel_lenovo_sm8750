@@ -36,8 +36,6 @@
 /* GPIO that reports the microSD card presence. */
 #define HQ_SDCARD_GPIO	567
 
-#define HQ_STORE_BUF_LEN	40
-
 /*
  * Preloader data published before any vendor driver has registered:
  * firmware version, PMIC type and the haptic (vibrator) chip.  Stock .data
@@ -274,9 +272,12 @@ static ssize_t huaqin_show(struct kobject *kobj, struct attribute *a,
 static ssize_t huaqin_store(struct kobject *kobj, struct attribute *attr,
 			     const char *buf, size_t count)
 {
-	char tmp[HQ_STORE_BUF_LEN];
+	/*
+	 * sysfs hands over a NUL-terminated copy of the write, which may be
+	 * longer than any fixed stack buffer: match against it directly.
+	 */
+	const char *tmp = buf;
 
-	strcpy(tmp, buf);
 	pr_err("%s %s \n", __func__, tmp);
 
 	if (strstr(tmp, "Accelerometer")) {
