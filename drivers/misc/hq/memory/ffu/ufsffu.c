@@ -101,7 +101,7 @@ int build_ffu_update_list(struct ufs_hba *hba,
 			  struct ffu_inquiry *device)
 {
 	struct device *dev = hba->dev;
-	char *value;
+	char *value, *config_buf = NULL, *config_data, *record;
 	size_t len;
 	int list_count = 0, alloc_count, skip, field, ret;
 
@@ -122,12 +122,16 @@ config_loaded:
 	if (!cfg_entry)
 		goto list_done;
 	pr_notice("ufs_ffu: cfg size: %zu\n", cfg_entry->size);
-	pr_notice("ufs_ffu: cfg data: %s\n", cfg_entry->data);
-	/* Keep auto-zeroed cursor lifetimes at the stock parsing call sites. */
-	char *config_data;
-
-	config_data = kstrdup(cfg_entry->data, GFP_KERNEL);
-	char *record;
+	pr_notice("ufs_ffu: cfg data: %.*s\n", (int)cfg_entry->size,
+		  (const char *)cfg_entry->data);
+	/*
+	 * strsep() advances the cursor, so keep the allocation in config_buf
+	 * and only ever kfree() that. The firmware blob is not NUL-terminated.
+	 */
+	config_buf = kmemdup_nul(cfg_entry->data, cfg_entry->size, GFP_KERNEL);
+	if (!config_buf)
+		goto list_done;
+	config_data = config_buf;
 
 	record = strsep(&config_data, "\n");
 	while (record && *record) {
@@ -152,9 +156,9 @@ empty_list:
 			goto empty_list;
 		}
 		memset(*need_update, 0, list_count * sizeof(**need_update));
-		kfree(config_data);
-		config_data = kstrdup(cfg_entry->data, GFP_KERNEL);
-		record = NULL;
+		/* The first pass split the copy in place; parse it again. */
+		memcpy(config_buf, cfg_entry->data, cfg_entry->size);
+		config_data = config_buf;
 		record = strsep(&config_data, "\n");
 		list_count = 0;
 		/*
@@ -246,9 +250,9 @@ next_field:
 next_record:
 			record = strsep(&config_data, "\n");
 		}
-		kfree(config_data);
 	}
 list_done:
+	kfree(config_buf);
 	pr_notice("ufs_ffu: list_count:%d\n", list_count);
 	return list_count;
 }
@@ -318,8 +322,15 @@ int start_ffu(struct ffu_data *data)
 			     strlen(item->product_rev_to)))
 			pr_notice("ufs_ffu: ufs_ffu firmware is already the newest now\n");
 	}
-	if (cfg_entry)
+	if ((void *)items != &need_update_k) {
+		for (i = 0; i < item_count; i++)
+			kvfree(items[i].fw_addr);
+		kfree(items);
+	}
+	if (cfg_entry) {
 		release_firmware(cfg_entry);
+		cfg_entry = NULL;
+	}
 	return ret;
 }
 #line 288 "ufsffu.c"
