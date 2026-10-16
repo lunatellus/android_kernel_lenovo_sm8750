@@ -225,12 +225,17 @@ empty_list:
 					((*need_update) + list_count)->fw_addr =
 						kvmalloc(ufs_firmware->size + 1, GFP_KERNEL);
 					if (!((*need_update) + list_count)->fw_addr) {
+						/*
+						 * Do not count the entry: start_ffu() would
+						 * pass the NULL buffer to the device update.
+						 */
 						pr_err("ufs_ffu: can't alloc memory for %s!",
 						       value);
-					} else {
-						memcpy(((*need_update) + list_count)->fw_addr,
-						       ufs_firmware->data, ufs_firmware->size);
+						release_firmware(ufs_firmware);
+						goto list_done;
 					}
+					memcpy(((*need_update) + list_count)->fw_addr,
+					       ufs_firmware->data, ufs_firmware->size);
 					pr_notice("ufs_ffu: %s, index:%d, fw_size:%zu\n",
 						  value, field,
 						  ((*need_update) + list_count)->firmware_size);
