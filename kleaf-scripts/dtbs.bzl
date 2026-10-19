@@ -1,5 +1,5 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
-load(":kleaf-scripts/msm_kernel_extensions.bzl", "get_custom_dtbo_img_list", "get_dtb_list", "get_dtbo_list", "get_dtstree", "get_techpack_dtbo_list")
+load(":kleaf-scripts/msm_kernel_extensions.bzl", "get_custom_dtbo_img_list", "get_dtb_list", "get_dtbo_list", "get_dtstree")
 load("//build/kernel/kleaf:kernel.bzl", "kernel_build", "kernel_build_config")
 
 def define_qcom_dtb_setup():
@@ -66,10 +66,6 @@ def define_qcom_dtbs(
     dtbo_list = get_dtbo_list(target)
     custom_dtbo_img_list = get_custom_dtbo_img_list(target)
 
-    # Techpack overlays ship next to the DTBs so the Android build can merge
-    # them into dtb.img; dtbo_list stays limited to the board overlays.
-    techpack_dtbo_list = get_techpack_dtbo_list(target)
-
     kernel_build(
         name = "{}_dtb_build".format(stem),
         srcs = [
@@ -79,7 +75,7 @@ def define_qcom_dtbs(
         ],
         build_config = ":{}.build.config.qcom.dtb".format(stem),
         dtstree = get_dtstree(target),
-        outs = dtb_list + dtbo_list + techpack_dtbo_list + ["vmlinux", "Module.symvers", "Image", "System.map", ".config"],
+        outs = dtb_list + dtbo_list + ["vmlinux", "Module.symvers", "Image", "System.map", ".config"],
         base_kernel = ":{}_base_kernel".format(stem),
         kconfig_ext = ":kconfig.msm.generated",
         makefile = "//common:Makefile",
