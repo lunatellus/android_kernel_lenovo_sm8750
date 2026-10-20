@@ -2619,7 +2619,7 @@ static void lenovo_chg_monitor_work(struct work_struct *work)
 		}
 	}
 
-	pr_info("TYPE = [%s,%d,%d], VBUS = [%d,%d], USB_TEMP = [%d,%d], BATT_TEMP = %d, GPIO:[%d,%d]\n",
+	pr_debug("TYPE = [%s,%d,%d], VBUS = [%d,%d], USB_TEMP = [%d,%d], BATT_TEMP = %d, GPIO:[%d,%d]\n",
 		get_usb_type_name(usb->prop[USB_REAL_TYPE]), usb_psy_desc[USB_1_PORT_ID].type,
 		wls_psy_desc.type, usb->prop[USB_VOLT_NOW],
 		wls->prop[WLS_VOLT_NOW], temp1, temp2, batt_temp_c,
