@@ -1574,7 +1574,8 @@ static void walt_cfs_replace_next_task_fair(void *unused, struct rq *rq, struct 
 	if (walt_quiet_state)
 		return;
 	/* ACK removed repick; honor the UX task chosen by the earlier Lenovo hook. */
-	if (lenovo_hyper_task_selected(rq, *p)) {
+	if (IS_REACHABLE(CONFIG_LENOVO_HYPERSCHED) &&
+	    lenovo_hyper_task_selected(rq, *p)) {
 		wrq->mvp_arrival_time = 0;
 		return;
 	}

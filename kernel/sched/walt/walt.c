@@ -6221,7 +6221,8 @@ static void walt_init(struct work_struct *work)
 static DECLARE_WORK(walt_init_work, walt_init);
 static void android_vh_update_topology_flags_workfn(void *unused, void *unused2)
 {
-	if (READ_ONCE(hyper_module_modprobe_finish))
+	if (!IS_REACHABLE(CONFIG_LENOVO_HYPERSCHED) ||
+	    READ_ONCE(hyper_module_modprobe_finish))
 		schedule_work(&walt_init_work);
 }
 
@@ -6232,7 +6233,8 @@ static void android_vh_update_topology_flags_workfn(void *unused, void *unused2)
 static int walt_module_init(void)
 {
 	/* The symbol dependency loads Lenovo first; refuse partial hook setup. */
-	if (!READ_ONCE(hyper_module_modprobe_finish))
+	if (IS_REACHABLE(CONFIG_LENOVO_HYPERSCHED) &&
+	    !READ_ONCE(hyper_module_modprobe_finish))
 		return -ENODEV;
 
 	/* compile time checks for vendor data size */
