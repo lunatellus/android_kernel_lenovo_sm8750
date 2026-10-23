@@ -50,17 +50,19 @@ static ssize_t reclaim_store(struct kobject *kobj, struct kobj_attribute *attr,
 {
 	unsigned long nr_to_reclaim = 0, nr;
 	unsigned long nr_reclaimed;
+	int type;
 
-	if (sscanf(buf, "%d %ld", &reclaim_type, &nr_to_reclaim) != 2) {
+	if (sscanf(buf, "%d %ld", &type, &nr_to_reclaim) != 2) {
 		pr_err("extend_reclaim: invalid input: %s", buf);
 		return -EINVAL;
 	}
 	nr = nr_to_reclaim;
-	if (reclaim_type >= ARRAY_SIZE(reclaim_type_str)) {
-		pr_err("extend_reclaim: invalid input: reclaim type = %s, nr_to_reclaim = %ld",
-		       reclaim_type_str[reclaim_type], nr);
+	if (type < 0 || type >= ARRAY_SIZE(reclaim_type_str)) {
+		pr_err("extend_reclaim: invalid input: reclaim type = %d, nr_to_reclaim = %ld",
+		       type, nr);
 		return -EINVAL;
 	}
+	reclaim_type = type;
 	nr_reclaimed = try_to_free_mem_cgroup_pages(NULL, nr, GFP_KERNEL,
 			(reclaim_type == EXTEND_RECLAIM_TYPE_ANON ||
 			 reclaim_type == EXTEND_RECLAIM_TYPE_ALL) ?
