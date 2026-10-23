@@ -3048,7 +3048,6 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 err_platform_driver_init_failed:
 	platform_device_unregister(nvt_ts_pdev);
 err_platform_device_init_failed:
-	kfree(nvt_ts_pdev);
 	nvt_ts_pdev = NULL;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 err_register_suspend_resume_failed:
@@ -3731,7 +3730,7 @@ static struct spi_driver nvt_spi_driver = {
 };
 static void nvt_ts_pdev_release(struct device *dev)
 {
-	kfree(nvt_ts_pdev);
+	kfree(to_platform_device(dev));
 }
 
 
@@ -3753,6 +3752,7 @@ static int32_t nvt_ts_platform_device_init(void)
 	if (ret) {
 		pr_err("[%s] %s %d: failed register nvt platform device, %d",
 		       NVT_SPI_NAME, __func__, 2474, ret);
+		platform_device_put(nvt_ts_pdev);
 		return ret;
 	}
 
