@@ -10,23 +10,23 @@
 #include "haptic_hv.h"
 #include "haptic_hv_reg.h"
 
-static RAW_NOTIFIER_HEAD(haptic_notifier_list);
+static BLOCKING_NOTIFIER_HEAD(haptic_notifier_list);
 
 int register_haptic_notify(struct notifier_block *nb)
 {
-	return raw_notifier_chain_register(&haptic_notifier_list, nb);
+	return blocking_notifier_chain_register(&haptic_notifier_list, nb);
 }
 EXPORT_SYMBOL(register_haptic_notify);
 
 int unregister_haptic_notify(struct notifier_block *nb)
 {
-	return raw_notifier_chain_unregister(&haptic_notifier_list, nb);
+	return blocking_notifier_chain_unregister(&haptic_notifier_list, nb);
 }
 EXPORT_SYMBOL(unregister_haptic_notify);
 
 int haptic_notify_call_chain(unsigned long action, void *data)
 {
-	return raw_notifier_call_chain(&haptic_notifier_list, action, data);
+	return blocking_notifier_call_chain(&haptic_notifier_list, action, data);
 }
 EXPORT_SYMBOL(haptic_notify_call_chain);
 
