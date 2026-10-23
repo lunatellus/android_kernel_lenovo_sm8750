@@ -4031,7 +4031,7 @@ static int battery_chg_probe(struct platform_device *pdev)
 
 	rc = battery_chg_register_panel_notifier(bcdev);
 	if (rc < 0)
-		return rc;
+		goto wakeup_error;
 
 	client_data.id = MSG_OWNER_BC;
 	client_data.name = "battery_charger";
@@ -4171,21 +4171,29 @@ error:
 	bcdev->initialized = false;
 	up_write(&bcdev->state_sem);
 
-	cancel_work_sync(&bcdev->usb_type_work);
-	cancel_work_sync(&bcdev->subsys_up_work);
-	cancel_work_sync(&bcdev->battery_check_work);
+	disable_work_sync(&bcdev->usb_type_work);
+	disable_work_sync(&bcdev->subsys_up_work);
+	disable_work_sync(&bcdev->battery_check_work);
+	disable_delayed_work_sync(&bcdev->lenovo_chg_monitor_work);
+	disable_delayed_work_sync(&bcdev->device_info_work);
 	complete(&bcdev->ack);
 	unregister_reboot_notifier(&bcdev->reboot_notifier);
 	pmic_glink_unregister_client(bcdev->client);
 reg_error:
 	if (bcdev->notifier_cookie)
 		panel_event_notifier_unregister(bcdev->notifier_cookie);
+wakeup_error:
+	wakeup_source_unregister(bcdev->charge_wakelock);
 	return rc;
 }
 
 static void battery_chg_remove(struct platform_device *pdev)
 {
 	struct battery_chg_dev *bcdev = platform_get_drvdata(pdev);
+
+	sysfs_remove_group(&bcdev->psy_list[PSY_TYPE_USB].psy->dev.kobj,
+			   &usb_psy_attrs_group);
+	gbcdev = NULL;
 
 	down_write(&bcdev->state_sem);
 	atomic_set(&bcdev->state, PMIC_GLINK_STATE_DOWN);
@@ -4198,9 +4206,12 @@ static void battery_chg_remove(struct platform_device *pdev)
 	device_init_wakeup(bcdev->dev, false);
 	debugfs_remove_recursive(bcdev->debugfs_dir);
 	class_unregister(&bcdev->battery_class);
-	cancel_work_sync(&bcdev->subsys_up_work);
-	cancel_work_sync(&bcdev->usb_type_work);
-	cancel_work_sync(&bcdev->battery_check_work);
+	disable_work_sync(&bcdev->subsys_up_work);
+	disable_work_sync(&bcdev->usb_type_work);
+	disable_work_sync(&bcdev->battery_check_work);
+	disable_delayed_work_sync(&bcdev->lenovo_chg_monitor_work);
+	disable_delayed_work_sync(&bcdev->device_info_work);
+	wakeup_source_unregister(bcdev->charge_wakelock);
 	unregister_reboot_notifier(&bcdev->reboot_notifier);
 	pmic_glink_unregister_client(bcdev->client);
 	if (bcdev->typec_class)
