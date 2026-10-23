@@ -279,7 +279,7 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 {
 	struct device_node *np;
 	int num_sensors, num_listener, num_ntc;
-	int ret, i, j;
+	int ret, i, j, registered = 0;
 
 	/* Stock logs through &pdev->dev before testing pdev for NULL. */
 	dev_err(&pdev->dev, "Enter\n");
@@ -299,13 +299,15 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 	}
 
 	num_listener = of_property_count_strings(np, PROP_LISTENER_NAMES);
-	if (num_listener <= 0)
+	if (num_listener > 0 && num_listener < 7) {
 		dev_err(&pdev->dev, "bad number of sensors-listener: %d\n",
 			num_listener);
+		return -EINVAL;
+	}
 
 	num_ntc = of_property_count_strings(np, PROP_ALL_NTC_NAMES);
-	if (num_ntc <= 0)
-		dev_err(&pdev->dev, "bad number of all_ntc_nums: %d\n", num_ntc);
+	if (num_ntc < 0)
+		num_ntc = 0;
 
 	sys_temp_dev = devm_kzalloc(&pdev->dev, sizeof(*sys_temp_dev), GFP_KERNEL);
 	if (!sys_temp_dev) {
@@ -314,12 +316,15 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 	}
 	sys_temp_dev->pdev = pdev;
 	sys_temp_dev->num_sensors = num_sensors;
+	INIT_DELAYED_WORK(&sys_temp_dev->temp_changed_work,
+			  temp_changed_work_func);
 
 	sys_temp_dev->sensor = devm_kzalloc(&pdev->dev,
 			sizeof(*sys_temp_dev->sensor) * num_sensors, GFP_KERNEL);
 	if (!sys_temp_dev->sensor) {
 		dev_err(&pdev->dev, "Unable to alloc memory for sensor\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err_unregister;
 	}
 
 	for (i = 0; i < num_sensors; i++) {
@@ -338,9 +343,10 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 		if (IS_ERR(sys_temp_dev->sensor[i].tz_dev)) {
 			dev_err(&pdev->dev,
 				"thermal_zone_device_register_with_trips() failed.\n");
-			ret = -ENODEV;
+			ret = PTR_ERR(sys_temp_dev->sensor[i].tz_dev);
 			goto err_unregister;
 		}
+		registered++;
 	}
 	platform_set_drvdata(pdev, sys_temp_dev);
 
@@ -359,13 +365,18 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 	if (!sys_temp_dev->sensor_listener) {
 		dev_err(&pdev->dev,
 			"Unable to alloc memory for sensor_listener\n");
-		return 0;
+		ret = -ENOMEM;
+		goto err_unregister;
 	}
 
 	sys_temp_dev->all_ntc_num = num_ntc;
 	sys_temp_dev->all_ntc_sensors = devm_kzalloc(&pdev->dev,
 			sizeof(*sys_temp_dev->all_ntc_sensors) * num_ntc,
 			GFP_KERNEL);
+	if (!sys_temp_dev->all_ntc_sensors) {
+		ret = -ENOMEM;
+		goto err_unregister;
+	}
 
 	for (i = 0; i < num_ntc; i++) {
 		ret = of_property_read_string_index(np, PROP_ALL_NTC_NAMES, i,
@@ -373,7 +384,7 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(&pdev->dev,
 				"Unable to read all_ntc_sensors string\n");
-			return ret;
+			goto err_unregister;
 		}
 		sys_temp_dev->all_ntc_sensors[i].temp = 0;
 		sys_temp_dev->all_ntc_sensors[i].tz_dev =
@@ -386,8 +397,6 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 
 	hq_regiser_hw_info(HWID_THERMAL, get_all_ntc_thermal_temp());
 
-	INIT_DELAYED_WORK(&sys_temp_dev->temp_changed_work,
-			  temp_changed_work_func);
 	schedule_delayed_work(&sys_temp_dev->temp_changed_work,
 			      LENOVO_SYS_TEMP_FIRST_DELAY_JIFFIES);
 	/* Stock .text 0x584 logs this before returning success. */
@@ -395,12 +404,11 @@ static int lenovo_sys_temp_probe(struct platform_device *pdev)
 	return 0;
 
 err_unregister:
-	/* Stock .text 0x3d0..0x40c: forward walk over the zones registered so
-	 * far, then the device memory is released; sys_temp_dev keeps the
-	 * stale pointer. */
-	for (j = 0; j < i; j++)
+	for (j = 0; j < registered; j++)
 		thermal_zone_device_unregister(sys_temp_dev->sensor[j].tz_dev);
+	platform_set_drvdata(pdev, NULL);
 	devm_kfree(&pdev->dev, sys_temp_dev);
+	sys_temp_dev = NULL;
 	return ret;
 }
 
@@ -410,8 +418,7 @@ static void lenovo_sys_temp_remove(struct platform_device *pdev)
 	struct lenovo_sys_temp_dev *dev = platform_get_drvdata(pdev);
 	int i;
 
-	if (dev->num_sensors_listener && dev->sensor_listener)
-		cancel_delayed_work_sync(&dev->temp_changed_work);
+	cancel_delayed_work_sync(&dev->temp_changed_work);
 	for (i = 0; i < dev->num_sensors; i++)
 		thermal_zone_device_unregister(dev->sensor[i].tz_dev);
 
