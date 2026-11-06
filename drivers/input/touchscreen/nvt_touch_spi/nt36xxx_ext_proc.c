@@ -905,32 +905,36 @@ int32_t nvt_cmd_store(uint8_t u8Cmd)
 		ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
 		if (ret < 0) {
 			NVT_ERR("Set event buffer index fail!\n");
-			mutex_unlock(&ts->cmd_lock);
-			return ret;
+			goto out;
 		}
 
 		for (i = 0; i < retry; i++) {
 			//---set cmd status---
 			buf[0] = EVENT_MAP_HOST_CMD;
 			buf[1] = u8Cmd;
-			CTP_SPI_WRITE(ts->client, buf, 2);
+			ret = CTP_SPI_WRITE(ts->client, buf, 2);
+			if (ret < 0)
+				goto out;
 
 			msleep(20);
 
 			//---read cmd status---
 			buf[0] = EVENT_MAP_HOST_CMD;
 			buf[1] = 0xFF;
-			CTP_SPI_READ(ts->client, buf, 2);
+			ret = CTP_SPI_READ(ts->client, buf, 2);
+			if (ret < 0)
+				goto out;
 			if (buf[1] == 0x00)
 				break;
 		}
 		if (unlikely(i == retry)) {
 			NVT_ERR("send Cmd 0x%02X failed, buf[1]=0x%02X\n", u8Cmd, buf[1]);
-			ret = -1;
+			ret = -ETIMEDOUT;
 		} else {
 			NVT_LOG("send Cmd 0x%02X success, tried %d times\n", u8Cmd, i);
 		}
 
+out:
 		mutex_unlock(&ts->cmd_lock);
 	} else {
 		NVT_LOG("Bypass Cmd 0x%02X\n", u8Cmd);
@@ -954,8 +958,7 @@ int32_t nvt_ext_cmd_store(uint8_t u8Cmd, uint8_t u8subCmd)
 		ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR | EVENT_MAP_HOST_CMD);
 		if (ret < 0) {
 			NVT_ERR("Set event buffer index fail!\n");
-			mutex_unlock(&ts->cmd_lock);
-			return ret;
+			goto out;
 		}
 
 		for (i = 0; i < retry; i++) {
@@ -963,14 +966,18 @@ int32_t nvt_ext_cmd_store(uint8_t u8Cmd, uint8_t u8subCmd)
 			buf[0] = EVENT_MAP_HOST_CMD;
 			buf[1] = u8Cmd;
 			buf[2] = u8subCmd;
-			CTP_SPI_WRITE(ts->client, buf, 3);
+			ret = CTP_SPI_WRITE(ts->client, buf, 3);
+			if (ret < 0)
+				goto out;
 
 			msleep(20);
 
 			//---read cmd status---
 			buf[0] = EVENT_MAP_HOST_CMD;
 			buf[1] = 0xFF;
-			CTP_SPI_READ(ts->client, buf, 2);
+			ret = CTP_SPI_READ(ts->client, buf, 2);
+			if (ret < 0)
+				goto out;
 			if (buf[1] == 0x00)
 				break;
 		}
@@ -978,12 +985,13 @@ int32_t nvt_ext_cmd_store(uint8_t u8Cmd, uint8_t u8subCmd)
 		if (unlikely(i == retry)) {
 			NVT_ERR("send Cmd 0x%02X 0x%02X failed, buf[1]=0x%02X\n",
 				u8Cmd, u8subCmd, buf[1]);
-			ret = -1;
+			ret = -ETIMEDOUT;
 		} else {
 			NVT_LOG("send Cmd 0x%02X 0x%02X success, tried %d times\n",
 				u8Cmd, u8subCmd, i);
 		}
 
+out:
 		mutex_unlock(&ts->cmd_lock);
 	} else {
 		NVT_LOG("Bypass Cmd 0x%02X 0x%02X \n", u8Cmd, u8subCmd);
@@ -1013,21 +1021,22 @@ int32_t nvt_edge_reject_set(int32_t status)
 }
 
 static ssize_t nvt_edge_reject_store(struct file *file, const char *buffer, size_t count, loff_t *pos) {
-	char dbg[10] = { 0 };
-	int res = 0;
 	uint8_t state;
-	
-	res = copy_from_user(dbg, (uint8_t *) buffer, sizeof(uint8_t));
-	if (res)
+	int ret;
+
+	/* kstrtou8_from_user copies at most ten bytes. */
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
+	if (ret < 0)
+		return ret;
+	if (state > 3)
 		return -EINVAL;
 
-	res = kstrtou8(dbg, 16, &state);
-	if (res < 0)
-		return res;
-
+	ret = nvt_edge_reject_set(state);
+	if (ret < 0)
+		return ret;
 	ts->edge_reject_state = state;
-		
-	nvt_edge_reject_set(ts->edge_reject_state);
 
 	return count;
 }
@@ -1090,7 +1099,7 @@ static const struct file_operations nvt_edge_reject_fops = {
 #line 1162
 int32_t nvt_edge_grid_zone_set(uint8_t deg, uint8_t dir, uint16_t y1, uint16_t y2)
 {
-	int i, retry = 5;
+	int i, ret = 0, retry = 5;
 	uint8_t buf[12] = {0};
 
 	if (ts->cmd_flag) {
@@ -1098,7 +1107,9 @@ int32_t nvt_edge_grid_zone_set(uint8_t deg, uint8_t dir, uint16_t y1, uint16_t y
 			return -ERESTARTSYS;
 
 		//---set xdata index to EVENT BUF ADDR---(set page)
-		nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+		ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+		if (ret < 0)
+			goto out;
 
 		for (i = 0; i < retry; i++) {
 			/*---set cmd status---*/
@@ -1111,7 +1122,9 @@ int32_t nvt_edge_grid_zone_set(uint8_t deg, uint8_t dir, uint16_t y1, uint16_t y
 			buf[6] = (uint8_t) ((y1 >> 8) & 0xFF);
 			buf[7] = (uint8_t) (y2 & 0xFF);
 			buf[8] = (uint8_t) ((y2 >> 8) & 0xFF);
-			CTP_SPI_WRITE(ts->client, buf, 9);
+			ret = CTP_SPI_WRITE(ts->client, buf, 9);
+			if (ret < 0)
+				goto out;
 
 			msleep(20);
 
@@ -1125,7 +1138,9 @@ int32_t nvt_edge_grid_zone_set(uint8_t deg, uint8_t dir, uint16_t y1, uint16_t y
 			buf[6] = 0xFF;
 			buf[7] = 0xFF;
 			buf[8] = 0xFF;
-			CTP_SPI_READ(ts->client, buf, 9);
+			ret = CTP_SPI_READ(ts->client, buf, 9);
+			if (ret < 0)
+				goto out;
 			if (buf[1] == 0x00)
 				break;
 		}
@@ -1133,51 +1148,59 @@ int32_t nvt_edge_grid_zone_set(uint8_t deg, uint8_t dir, uint16_t y1, uint16_t y
 		if (unlikely(i == retry)) {
 			NVT_ERR("send Cmd 0x%02X 0x%02X failed, buf[1]=0x%02X\n",
 				NVT_EXT_CMD, NVT_EXT_CMD_EDGE_GRID_ZONE, buf[1]);
-			mutex_unlock(&ts->cmd_lock);
-			return -1;
+			ret = -ETIMEDOUT;
 		} else {
 			NVT_LOG("send Cmd 0x%02X 0x%02X success, tried %d times\n",
 				NVT_EXT_CMD, NVT_EXT_CMD_EDGE_GRID_ZONE, i);
 		}
+out:
 		mutex_unlock(&ts->cmd_lock);
 	} else {
 		NVT_LOG("Bypass Cmd 0x%02X 0x%02X \n", NVT_EXT_CMD, NVT_EXT_CMD_EDGE_GRID_ZONE);
 	}
-	/* Stock (0x8be4-0x8bf0) releases ts->lock here although this function never takes it. */
-	mutex_unlock(&ts->lock);
 
-	return 0;
+	return ret;
 }
 #line 1144
 static ssize_t nvt_edge_grid_zone_store(struct file *file, const char *buffer, size_t count, loff_t *pos) {
-    int32_t tmp[4] = { 0 };
-    uint8_t ret;
-    char buf[16] = { 0 };
+	uint16_t value[4];
+	char buf[32], *cursor = buf, *field;
+	int i, ret;
 
-    ret = copy_from_user(buf, (uint8_t *) buffer, count);
-    if (ret)
-        return -EINVAL;
+	if (!count || count >= sizeof(buf))
+		return -EINVAL;
+	if (copy_from_user(buf, buffer, count))
+		return -EFAULT;
+	buf[count] = '\0';
+	if (memchr(buf, '\0', count))
+		return -EINVAL;
 
-    pr_err("[%s] %s %d: buf=%s\n", NVT_SPI_NAME, __func__, 1233, buf);
+	for (i = 0; i < ARRAY_SIZE(value); i++) {
+		field = strsep(&cursor, ",");
+		if (!field)
+			return -EINVAL;
+		ret = kstrtou16(field, 10, &value[i]);
+		if (ret < 0)
+			return ret;
+	}
+	if (cursor)
+		return -EINVAL;
 
-    ret = sscanf(buf, "%d,%d,%d,%d",
-        tmp, tmp+1, tmp+2, tmp+3);
+	/* The zero-initialized tuple is also replayed during recovery. */
+	if (value[0] || value[1] || value[2] || value[3]) {
+		if (value[0] < 1 || value[0] > 4 ||
+		    value[1] < 1 || value[1] > 2 || value[2] > value[3] ||
+		    value[3] > input_abs_get_max(ts->input_dev, ABS_MT_POSITION_Y))
+			return -EINVAL;
+	}
 
-    ts->edge_grid_zone_info.degree = (uint8_t) tmp[0];
-    ts->edge_grid_zone_info.direction = (uint8_t) tmp[1];
-    ts->edge_grid_zone_info.y1 = (uint16_t) tmp[2];
-    ts->edge_grid_zone_info.y2 = (uint16_t) tmp[3];
-
-    pr_err("[%s] %s %d: cmd_parm = %d,%d,%d,%d\n", NVT_SPI_NAME, __func__, 1245,
-        ts->edge_grid_zone_info.degree,
-        ts->edge_grid_zone_info.direction,
-        ts->edge_grid_zone_info.y1,
-        ts->edge_grid_zone_info.y2);
-
-    nvt_edge_grid_zone_set(ts->edge_grid_zone_info.degree,
-        ts->edge_grid_zone_info.direction,
-        ts->edge_grid_zone_info.y1,
-        ts->edge_grid_zone_info.y2);
+	ret = nvt_edge_grid_zone_set(value[0], value[1], value[2], value[3]);
+	if (ret < 0)
+		return ret;
+	ts->edge_grid_zone_info.degree = value[0];
+	ts->edge_grid_zone_info.direction = value[1];
+	ts->edge_grid_zone_info.y1 = value[2];
+	ts->edge_grid_zone_info.y2 = value[3];
 
 	return count;
 }
@@ -1231,24 +1254,20 @@ static int32_t nvt_game_edge_open(struct inode *inode, struct file *file)
 static ssize_t nvt_game_edge_store(struct file *file, const char __user *buffer,
 			    size_t count, loff_t *pos)
 {
-	char dbg[10] = { 0 };
 	uint8_t state;
-	uint8_t ret;
+	int ret;
 
-	ret = copy_from_user(dbg, (uint8_t *)buffer, sizeof(uint8_t));
-	if (ret)
-		return -EINVAL;
-
-	ret = kstrtou8(dbg, 16, &state);
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
 	if (ret < 0)
 		return ret;
 
 	pr_err("[%s] %s %d: game edge state  %d!\n", NVT_SPI_NAME, __func__, 1838, state);
-	if (ts->game_edge_state == state)
-		return count;
-
+	ret = nvt_game_edge_set(state);
+	if (ret < 0)
+		return ret;
 	ts->game_edge_state = state;
-	nvt_game_edge_set(ts->game_edge_state);
 
 	return count;
 }
@@ -1289,21 +1308,23 @@ int32_t nvt_game_mode_set(uint8_t status)
 	return nvt_ext_cmd_store(GAME_MODE_PALM_CMD, mode);
 }
 static ssize_t nvt_game_mode_store(struct file *file, const char *buffer, size_t count, loff_t *pos) {
-	char dbg[10] = { 0 };
 	uint8_t state;
-	uint8_t ret;
-	
-	ret = copy_from_user(dbg, (uint8_t *) buffer, sizeof(uint8_t));
-	if (ret)
-		return -EINVAL;
+	int ret;
 
-	ret = kstrtou8(dbg, 16, &state);
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
 	if (ret < 0)
 		return ret;
 
+	if (state > 5)
+		return -EINVAL;
+
 	pr_err("[%s] %s %d: moto_apk_state %d!\n", NVT_SPI_NAME, __func__, 1332, state);
+	ret = nvt_game_mode_set(state);
+	if (ret < 0)
+		return ret;
 	ts->game_mode_state = state;
-	nvt_game_mode_set(ts->game_mode_state);
 
 	return count;
 }
@@ -1356,15 +1377,18 @@ static ssize_t nvt_get_pen_id_write(struct file *file,
 				    size_t count, loff_t *pos)
 {
 	uint32_t input = 0;
-	char buf[128] = { 0 };
+	char buf[128];
 	uint8_t data_type;
 	int32_t ret;
 	NVT_LOG("++\n");
 
+	if (!count || count >= sizeof(buf))
+		return -EINVAL;
 	if (copy_from_user(buf, buffer, count)) {
 		NVT_ERR("input value error\n");
-		return -EINVAL;
+		return -EFAULT;
 	}
+	buf[count] = '\0';
 
 	if (kstrtouint(buf, 0, &input)) {
 		NVT_ERR("kstrtouint error\n");
@@ -1498,21 +1522,23 @@ int32_t nvt_support_pen_set(uint8_t status)
 	return ret;
 }
 static ssize_t nvt_support_pen_store(struct file *file, const char *buffer, size_t count, loff_t *pos) {
-	char dbg[10] = { 0 };
 	uint8_t state;
-	uint8_t ret;
-	
-	ret = copy_from_user(dbg, (uint8_t *) buffer, sizeof(uint8_t));
-	if (ret)
-		return -EINVAL;
+	int ret;
 
-	ret = kstrtou8(dbg, 16, &state);
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
 	if (ret < 0)
 		return ret;
 
+	if (state > 1)
+		return -EINVAL;
+
 	pr_err("[%s] %s %d: %d\n", NVT_SPI_NAME, __func__, 1410, state);
+	ret = nvt_support_pen_set(state);
+	if (ret < 0)
+		return ret;
 	ts->pen_state = state;
-	nvt_support_pen_set(ts->pen_state);
 
 	return count;
 }
@@ -1555,21 +1581,23 @@ int32_t nvt_haptics_set(uint8_t state)
 static ssize_t nvt_haptics_store(struct file *file, const char *buffer,
 				 size_t count, loff_t *pos)
 {
-	char dbg[10] = { 0 };
 	uint8_t state;
-	uint8_t ret;
+	int ret;
 
-	ret = copy_from_user(dbg, (uint8_t *)buffer, sizeof(uint8_t));
-	if (ret)
-		return -EINVAL;
-
-	ret = kstrtou8(dbg, 16, &state);
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
 	if (ret < 0)
 		return ret;
 
+	if (state > 1)
+		return -EINVAL;
+
 	pr_err("[%s] %s %d: haptics state  %d!\n", NVT_SPI_NAME, __func__, 1511, state);
+	ret = nvt_haptics_set(state);
+	if (ret < 0)
+		return ret;
 	ts->haptics_state = state;
-	nvt_haptics_set(ts->haptics_state);
 
 	return count;
 }
@@ -1616,24 +1644,23 @@ static ssize_t nvt_high_report_rate_store(struct file *file,
 					  const char *buffer, size_t count,
 					  loff_t *pos)
 {
-	char dbg[10] = { 0 };
 	uint8_t state;
-	uint8_t ret;
+	int ret;
 
-	ret = copy_from_user(dbg, (uint8_t *)buffer, sizeof(uint8_t));
-	if (ret)
-		return -EINVAL;
-
-	ret = kstrtou8(dbg, 16, &state);
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
 	if (ret < 0)
 		return ret;
 
-	pr_err("[%s] %s %d: high report rate state  %d!\n", NVT_SPI_NAME, __func__, 1660, state);
-	if (ts->high_report_rate_state == state)
-		return count;
+	if (state > 1)
+		return -EINVAL;
 
+	pr_err("[%s] %s %d: high report rate state  %d!\n", NVT_SPI_NAME, __func__, 1660, state);
+	ret = nvt_high_report_rate_set(state);
+	if (ret < 0)
+		return ret;
 	ts->high_report_rate_state = state;
-	nvt_high_report_rate_set(ts->high_report_rate_state);
 
 	return count;
 }
@@ -1681,24 +1708,23 @@ static ssize_t nvt_report_threshold_store(struct file *file,
 					  const char *buffer, size_t count,
 					  loff_t *pos)
 {
-	char dbg[10] = { 0 };
 	uint8_t state;
-	uint8_t ret;
+	int ret;
 
-	ret = copy_from_user(dbg, (uint8_t *)buffer, sizeof(uint8_t));
-	if (ret)
-		return -EINVAL;
-
-	ret = kstrtou8(dbg, 16, &state);
+	if (count > 10)
+		return -E2BIG;
+	ret = kstrtou8_from_user(buffer, count, 16, &state);
 	if (ret < 0)
 		return ret;
 
-	pr_err("[%s] %s %d: report threshold state  %d!\n", NVT_SPI_NAME, __func__, 1732, state);
-	if (ts->report_threshld_state == state)
-		return count;
+	if (state > 3)
+		return -EINVAL;
 
+	pr_err("[%s] %s %d: report threshold state  %d!\n", NVT_SPI_NAME, __func__, 1732, state);
+	ret = nvt_report_threshold_set(state);
+	if (ret < 0)
+		return ret;
 	ts->report_threshld_state = state;
-	nvt_report_threshold_set(ts->report_threshld_state);
 
 	return count;
 }
@@ -1706,7 +1732,7 @@ static ssize_t nvt_report_threshold_store(struct file *file,
 #line 1775
 int32_t nvt_game_edge_set(uint8_t state)
 {
-	int i, retry = 5;
+	int i, ret = 0, retry = 5;
 	uint8_t buf[4] = {0};
 
 	if (ts->cmd_flag) {
@@ -1714,7 +1740,9 @@ int32_t nvt_game_edge_set(uint8_t state)
 			return -ERESTARTSYS;
 
 		//---set xdata index to EVENT BUF ADDR---(set page)
-		nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+		ret = nvt_set_page(ts->mmap->EVENT_BUF_ADDR);
+		if (ret < 0)
+			goto out;
 
 		for (i = 0; i < retry; i++) {
 			/*---set cmd status---*/
@@ -1722,7 +1750,9 @@ int32_t nvt_game_edge_set(uint8_t state)
 			buf[1] = NVT_EXT_CMD;
 			buf[2] = NVT_EXT_CMD_GAME_EDGE;
 			buf[3] = state;
-			CTP_SPI_WRITE(ts->client, buf, 4);
+			ret = CTP_SPI_WRITE(ts->client, buf, 4);
+			if (ret < 0)
+				goto out;
 
 			msleep(20);
 
@@ -1731,7 +1761,9 @@ int32_t nvt_game_edge_set(uint8_t state)
 			buf[1] = 0xFF;
 			buf[2] = 0xFF;
 			buf[3] = 0xFF;
-			CTP_SPI_READ(ts->client, buf, 4);
+			ret = CTP_SPI_READ(ts->client, buf, 4);
+			if (ret < 0)
+				goto out;
 			if (buf[1] == 0x00)
 				break;
 		}
@@ -1739,18 +1771,18 @@ int32_t nvt_game_edge_set(uint8_t state)
 		if (unlikely(i == retry)) {
 			NVT_ERR("send Cmd 0x%02X 0x%02X failed, buf[1]=0x%02X\n",
 				NVT_EXT_CMD, NVT_EXT_CMD_GAME_EDGE, buf[1]);
-			mutex_unlock(&ts->cmd_lock);
-			return -1;
+			ret = -ETIMEDOUT;
 		} else {
 			NVT_LOG("send Cmd 0x%02X 0x%02X success, tried %d times\n",
 				NVT_EXT_CMD, NVT_EXT_CMD_GAME_EDGE, i);
 		}
+out:
 		mutex_unlock(&ts->cmd_lock);
 	} else {
 		NVT_LOG("Bypass Cmd 0x%02X 0x%02X \n", NVT_EXT_CMD, NVT_EXT_CMD_GAME_EDGE);
 	}
 
-	return 0;
+	return ret;
 }
 
 #line 1719
