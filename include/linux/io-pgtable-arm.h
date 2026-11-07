@@ -208,8 +208,7 @@ static inline bool iopte_valid(arm_lpae_iopte pte)
 
 struct io_pgtable *kvm_arm_io_pgtable_alloc(struct io_pgtable_cfg *cfg,
 					    void *cookie,
-					    int *out_ret,
-						bool idmapped);
+					    int *out_ret, bool idmapped);
 int kvm_arm_io_pgtable_free(struct io_pgtable *iop);
 #else
 #define __arm_lpae_virt_to_phys	__pa

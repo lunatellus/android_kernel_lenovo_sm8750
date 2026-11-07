@@ -825,7 +825,7 @@ void arm_smmu_read_context_fault_info(struct arm_smmu_device *smmu, int idx,
 void arm_smmu_print_context_fault_info(struct arm_smmu_device *smmu, int idx,
 				       const struct arm_smmu_context_fault_info *cfi)
 {
-	dev_dbg(smmu->dev,
+	dev_err(smmu->dev,
 		"Unhandled context fault: fsr=0x%x, iova=0x%08lx, fsynr=0x%x, cbfrsynra=0x%x, cb=%d\n",
 		cfi->fsr, cfi->iova, cfi->fsynr, cfi->cbfrsynra, idx);
 
@@ -4235,12 +4235,20 @@ static int __init arm_smmu_init(void)
 		return ret;
 
 	ret = platform_driver_register(&arm_smmu_driver);
-	if (ret) {
-		platform_driver_unregister(&qsmmuv500_tbu_driver);
-		return ret;
-	}
+	if (ret)
+		goto err_unregister_tbu;
+
+	ret = arm_smmu_impl_module_init();
+	if (ret)
+		goto err_unregister_smmu;
 
 	trace_smmu_init(ktime_us_delta(ktime_get(), cur));
+	return 0;
+
+err_unregister_smmu:
+	platform_driver_unregister(&arm_smmu_driver);
+err_unregister_tbu:
+	platform_driver_unregister(&qsmmuv500_tbu_driver);
 	return ret;
 }
 subsys_initcall(arm_smmu_init);
@@ -4248,6 +4256,7 @@ subsys_initcall(arm_smmu_init);
 static void __exit arm_smmu_exit(void)
 {
 	platform_driver_unregister(&arm_smmu_driver);
+	arm_smmu_impl_module_exit();
 	platform_driver_unregister(&qsmmuv500_tbu_driver);
 }
 module_exit(arm_smmu_exit);

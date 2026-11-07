@@ -112,11 +112,15 @@ static int qmi_disable_remote_etm(struct remote_etm_drvdata *drvdata)
 }
 
 static int remote_etm_enable(struct coresight_device *csdev,
-			     struct perf_event *event, enum cs_mode mode)
+			     struct perf_event *event, enum cs_mode mode,
+			     __maybe_unused struct coresight_trace_id_map *id_map)
 {
 	struct remote_etm_drvdata *drvdata =
 		dev_get_drvdata(csdev->dev.parent);
 	int i, ret;
+
+	if (mode != CS_MODE_SYSFS)
+		return -EINVAL;
 
 	mutex_lock(&drvdata->mutex);
 

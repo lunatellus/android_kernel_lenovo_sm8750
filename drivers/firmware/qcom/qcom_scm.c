@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/interconnect.h>
 #include <linux/interrupt.h>
+#include <linux/kstrtox.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -50,8 +51,7 @@
 #include "qtee_shmbridge_internal.h"
 #include "lcp-ppddr-internal.h"
 
-static bool download_mode = IS_ENABLED(CONFIG_QCOM_SCM_DOWNLOAD_MODE_DEFAULT);
-module_param(download_mode, bool, 0);
+static u32 download_mode;
 
 static unsigned int pas_shutdown_retry_delay_ms = 5000;
 module_param(pas_shutdown_retry_delay_ms, uint, 0644);
@@ -135,7 +135,6 @@ enum qcom_scm_qseecom_tz_cmd_info {
 };
 
 #define QSEECOM_MAX_APP_NAME_SIZE		64
-
 #define SHMBRIDGE_RESULT_NOTSUPP		4
 
 /* Each bit configures cold/warm boot address for one of the 4 CPUs */
@@ -164,6 +163,8 @@ static const u8 qcom_scm_cpu_warm_bits[QCOM_SCM_BOOT_MAX_CPUS] = {
 #define QCOM_DLOAD_MASK		GENMASK(5, 4)
 #define QCOM_DLOAD_NODUMP	0
 #define QCOM_DLOAD_FULLDUMP	1
+#define QCOM_DLOAD_MINIDUMP	2
+#define QCOM_DLOAD_BOTHDUMP	3
 
 static const char * const qcom_scm_convention_names[] = {
 	[SMC_CONVENTION_UNKNOWN] = "unknown",
@@ -176,6 +177,13 @@ static const char * const qcom_scm_convention_names[] = {
 #define GIC_MAX_SPI       1019  // SPIs in GICv3 spec range from 32..1019
 #define GIC_ESPI_BASE     4096
 #define GIC_MAX_ESPI      5119 // ESPIs in GICv3 spec range from 4096..5119
+
+static const char * const download_mode_name[] = {
+	[QCOM_DLOAD_NODUMP]	= "off",
+	[QCOM_DLOAD_FULLDUMP]	= "full",
+	[QCOM_DLOAD_MINIDUMP]	= "mini",
+	[QCOM_DLOAD_BOTHDUMP]	= "full,mini",
+};
 
 static struct qcom_scm *__scm;
 
@@ -267,6 +275,9 @@ static DEFINE_SPINLOCK(scm_query_lock);
 
 struct qcom_tzmem_pool *qcom_scm_get_tzmem_pool(void)
 {
+	if (!qcom_scm_is_available())
+		return NULL;
+
 	return __scm->mempool;
 }
 
@@ -653,18 +664,34 @@ static int __qcom_scm_set_dload_mode(struct device *dev, enum qcom_download_mode
 	return qcom_scm_call_atomic(__scm->dev, &desc, NULL);
 }
 
+static int qcom_scm_io_rmw(phys_addr_t addr, unsigned int mask, unsigned int val)
+{
+	unsigned int old;
+	unsigned int new;
+	int ret;
+
+	ret = qcom_scm_io_readl(addr, &old);
+	if (ret)
+		return ret;
+
+	new = (old & ~mask) | (val & mask);
+
+	return qcom_scm_io_writel(addr, new);
+}
+
 void qcom_scm_set_download_mode(enum qcom_download_mode mode)
 {
 	int ret = 0;
 	struct device *dev = __scm ? __scm->dev : NULL;
 
 	if (__scm && __scm->dload_mode_addr) {
-		ret = qcom_scm_io_writel(__scm->dload_mode_addr, mode);
+		ret = qcom_scm_io_rmw(__scm->dload_mode_addr,
+				      QCOM_DLOAD_MASK | QCOM_DOWNLOAD_EDL, mode);
 	} else if (__qcom_scm_is_call_available(dev,
 				QCOM_SCM_SVC_BOOT,
 				QCOM_SCM_BOOT_SET_DLOAD_MODE)) {
 		ret = __qcom_scm_set_dload_mode(dev, mode);
-	} else {
+	} else if (mode) {
 		dev_err(dev,
 			"No available mechanism for setting download mode\n");
 	}
@@ -1279,7 +1306,7 @@ int qcom_scm_assign_mem(phys_addr_t mem_addr, size_t mem_sz,
 	if (ret) {
 		dev_err(__scm->dev,
 			"Assign memory protection call failed %d\n", ret);
-		return -EINVAL;
+		return ret;
 	}
 
 	*srcvm = next_vm;
@@ -2863,8 +2890,13 @@ EXPORT_SYMBOL_GPL(qcom_scm_qseecom_app_send);
  + any potential issues with this, only allow validated machines for now.
  */
 static const struct of_device_id qcom_scm_qseecom_allowlist[] __maybe_unused = {
+	{ .compatible = "dell,xps13-9345" },
 	{ .compatible = "lenovo,flex-5g" },
+	{ .compatible = "lenovo,thinkpad-t14s" },
 	{ .compatible = "lenovo,thinkpad-x13s", },
+	{ .compatible = "lenovo,yoga-slim7x" },
+	{ .compatible = "microsoft,romulus13", },
+	{ .compatible = "microsoft,romulus15", },
 	{ .compatible = "qcom,sc8180x-primus" },
 	{ .compatible = "qcom,x1e80100-crd" },
 	{ .compatible = "qcom,x1e80100-qcp" },
@@ -2955,7 +2987,8 @@ static int qcom_scm_qseecom_init(struct qcom_scm *scm)
  */
 bool qcom_scm_is_available(void)
 {
-	return !!READ_ONCE(__scm);
+	/* Paired with smp_store_release() in qcom_scm_probe */
+	return !!smp_load_acquire(&__scm);
 }
 EXPORT_SYMBOL_GPL(qcom_scm_is_available);
 
@@ -3262,13 +3295,52 @@ int  scm_mem_protection_init_do(void)
 	return resp;
 }
 
+static int get_download_mode(char *buffer, const struct kernel_param *kp)
+{
+	if (download_mode >= ARRAY_SIZE(download_mode_name))
+		return sysfs_emit(buffer, "unknown mode\n");
+
+	return sysfs_emit(buffer, "%s\n", download_mode_name[download_mode]);
+}
+
+static int set_download_mode(const char *val, const struct kernel_param *kp)
+{
+	bool tmp;
+	int ret;
+
+	ret = sysfs_match_string(download_mode_name, val);
+	if (ret < 0) {
+		ret = kstrtobool(val, &tmp);
+		if (ret < 0) {
+			pr_err("qcom_scm: err: %d\n", ret);
+			return ret;
+		}
+
+		ret = tmp ? 1 : 0;
+	}
+
+	download_mode = ret;
+	if (__scm)
+		qcom_scm_set_download_mode(FIELD_PREP(QCOM_DLOAD_MASK, download_mode));
+
+	return 0;
+}
+
+static const struct kernel_param_ops download_mode_param_ops = {
+	.get = get_download_mode,
+	.set = set_download_mode,
+};
+
+module_param_cb(download_mode, &download_mode_param_ops, NULL, 0644);
+MODULE_PARM_DESC(download_mode, "download mode: off/0/N for no dump mode, full/on/1/Y for full dump mode, mini for minidump mode and full,mini for both full and minidump mode together are acceptable values");
+
 static int qcom_scm_probe(struct platform_device *pdev)
 {
 	struct qcom_tzmem_pool_config pool_config;
 	struct qcom_scm *scm;
 	int ret;
 
-	struct device_node *dload = of_find_node_by_path("/soc/dload_mode");
+	struct device_node *dload;
 	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
 	if (!scm)
 		return -ENOMEM;
@@ -3326,48 +3398,25 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	__get_convention();
 	ret  = __qcom_multi_smc_init(scm, pdev);
 	if (ret)
-		return ret;
+		goto err;
 
 	/* open hab channels for non-atomic calls */
 	if (of_property_read_bool(pdev->dev.of_node, "qcom,scm-hab"))
 		scm_qcpe_hab_open_nonatomic(__scm->waitq.call_ctx_cnt);
 
-	scm->restart_nb.notifier_call = qcom_scm_do_restart;
-	scm->restart_nb.priority = 130;
-	register_restart_handler(&scm->restart_nb);
-
-	if (!dload) {
-		if (scm->dload_mode_addr &&
-				IS_ERR(platform_device_register_data(&pdev->dev, "qcom-dload-mode",
-						PLATFORM_DEVID_NONE, NULL, 0)))
-			dev_err(&pdev->dev,
-					"Failed to register qcom dload device\n");
-	} else {
-		of_node_put(dload);
-	}
-	/*
-	 * If requested enable "download mode", from this point on warmboot
-	 * will cause the boot stages to enter download mode, unless
-	 * disabled below by a clean shutdown/reboot.
-	 */
-	if (download_mode)
-		qcom_scm_set_download_mode(QCOM_DOWNLOAD_FULLDUMP);
-
-	/*
-	 * Disable SDI if indicated by DT that it is enabled by default.
-	 */
-	if (of_property_read_bool(pdev->dev.of_node, "qcom,sdi-enabled"))
-		qcom_scm_disable_sdi();
-
 	ret = of_reserved_mem_device_init(__scm->dev);
-	if (ret && ret != -ENODEV)
-		return dev_err_probe(__scm->dev, ret,
-				     "Failed to setup the reserved memory region for TZ mem\n");
+	if (ret && ret != -ENODEV) {
+		dev_err_probe(__scm->dev, ret,
+			      "Failed to setup the reserved memory region for TZ mem\n");
+		goto err;
+	}
 
 	ret = qcom_tzmem_enable(__scm->dev);
-	if (ret)
-		return dev_err_probe(__scm->dev, ret,
-				     "Failed to enable the TrustZone memory allocator\n");
+	if (ret) {
+		dev_err_probe(__scm->dev, ret,
+			      "Failed to enable the TrustZone memory allocator\n");
+		goto err;
+	}
 
 	memset(&pool_config, 0, sizeof(pool_config));
 	if (IS_ENABLED(CONFIG_QCOM_TZMEM_LOW_MEMORY))
@@ -3377,9 +3426,11 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	pool_config.policy = QCOM_TZMEM_POLICY_STATIC;
 	pool_config.max_size = pool_config.initial_size;
 	__scm->mempool = devm_qcom_tzmem_pool_new(__scm->dev, &pool_config);
-	if (IS_ERR(__scm->mempool))
-		return dev_err_probe(__scm->dev, PTR_ERR(__scm->mempool),
-				     "Failed to create the SCM memory pool\n");
+	if (IS_ERR(__scm->mempool)) {
+		ret = dev_err_probe(__scm->dev, PTR_ERR(__scm->mempool),
+				    "Failed to create the SCM memory pool\n");
+		goto err;
+	}
 
 	/*
 	 * Initialize the QSEECOM interface.
@@ -3394,7 +3445,44 @@ static int qcom_scm_probe(struct platform_device *pdev)
 	ret = qcom_scm_qseecom_init(scm);
 	WARN(ret < 0, "failed to initialize qseecom: %d\n", ret);
 
-	return qtee_shmbridge_driver_init();
+	ret = qtee_shmbridge_driver_init();
+	if (ret)
+		goto err;
+
+	dload = of_find_node_by_path("/soc/dload_mode");
+	scm->restart_nb.notifier_call = qcom_scm_do_restart;
+	scm->restart_nb.priority = 130;
+	register_restart_handler(&scm->restart_nb);
+
+	if (!dload) {
+		if (scm->dload_mode_addr &&
+				IS_ERR(platform_device_register_data(&pdev->dev, "qcom-dload-mode",
+						PLATFORM_DEVID_NONE, NULL, 0)))
+			dev_err(&pdev->dev,
+					"Failed to register qcom dload device\n");
+	} else {
+		of_node_put(dload);
+	}
+	/*
+	 * If "download mode" is requested, from this point on warmboot
+	 * will cause the boot stages to enter download mode, unless
+	 * disabled below by a clean shutdown/reboot.
+	 */
+	qcom_scm_set_download_mode(FIELD_PREP(QCOM_DLOAD_MASK, download_mode));
+
+	/*
+	 * Disable SDI if indicated by DT that it is enabled by default.
+	 */
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,sdi-enabled") || !download_mode)
+		qcom_scm_disable_sdi();
+
+	return 0;
+
+err:
+	/* Paired with smp_load_acquire() in qcom_scm_is_available(). */
+	smp_store_release(&__scm, NULL);
+
+	return ret;
 }
 
 static void qcom_scm_shutdown(struct platform_device *pdev)
@@ -3402,8 +3490,7 @@ static void qcom_scm_shutdown(struct platform_device *pdev)
 	qcom_scm_disable_sdi();
 	qcom_scm_halt_spmi_pmic_arbiter();
 	/* Clean shutdown, disable download mode to allow normal restart */
-	if (download_mode)
-		qcom_scm_set_download_mode(QCOM_DOWNLOAD_NODUMP);
+	qcom_scm_set_download_mode(QCOM_DOWNLOAD_NODUMP);
 }
 
 static int qcom_scm_pm_freeze(struct device *dev)

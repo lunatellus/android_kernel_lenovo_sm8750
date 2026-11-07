@@ -19,6 +19,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
+#include <linux/nvmem-provider.h>
 #include <linux/power_supply.h>
 #include <linux/platform_device.h>
 #include <linux/pm.h>
@@ -31,12 +32,18 @@
 #include <linux/bitops.h>
 #include <linux/math.h>
 
+#include <linux/unaligned.h>
+
 #define DRV_NAME "max1720x"
 
 /* Function Commands */
 #define MAX17330_COMMAND_COPY_NVM (0xE904)
 #define MAX17330_COMMAND_FULL_RESET (0x000F)
 #define MAX17330_COMMAND_RECALL_HISTORY_REMAINING_WRITES (0xE29B)
+
+/* Nonvolatile registers */
+#define MAX1720X_NXTABLE0		0x80
+#define MAX1720X_NDEVICE_NAME4		0xDF
 
 /* CONFIG register bits */
 #define MAX1720X_CONFIG_ALRT_EN BIT(2)
@@ -985,7 +992,111 @@ static const int cycles_reg_lsb_percents[] = {
 	[ID_MAX17335] = 25,
 };
 
-static enum power_supply_property max1720x_battery_props[] = {
+static const struct nvmem_cell_info max1720x_nvmem_cells[] = {
+	{ .name = "nXTable0",  .offset = 0,  .bytes = 2, },
+	{ .name = "nXTable1",  .offset = 2,  .bytes = 2, },
+	{ .name = "nXTable2",  .offset = 4,  .bytes = 2, },
+	{ .name = "nXTable3",  .offset = 6,  .bytes = 2, },
+	{ .name = "nXTable4",  .offset = 8,  .bytes = 2, },
+	{ .name = "nXTable5",  .offset = 10, .bytes = 2, },
+	{ .name = "nXTable6",  .offset = 12, .bytes = 2, },
+	{ .name = "nXTable7",  .offset = 14, .bytes = 2, },
+	{ .name = "nXTable8",  .offset = 16, .bytes = 2, },
+	{ .name = "nXTable9",  .offset = 18, .bytes = 2, },
+	{ .name = "nXTable10", .offset = 20, .bytes = 2, },
+	{ .name = "nXTable11", .offset = 22, .bytes = 2, },
+	{ .name = "nUser18C",  .offset = 24, .bytes = 2, },
+	{ .name = "nUser18D",  .offset = 26, .bytes = 2, },
+	{ .name = "nODSCTh",   .offset = 28, .bytes = 2, },
+	{ .name = "nODSCCfg",  .offset = 30, .bytes = 2, },
+
+	{ .name = "nOCVTable0",  .offset = 32, .bytes = 2, },
+	{ .name = "nOCVTable1",  .offset = 34, .bytes = 2, },
+	{ .name = "nOCVTable2",  .offset = 36, .bytes = 2, },
+	{ .name = "nOCVTable3",  .offset = 38, .bytes = 2, },
+	{ .name = "nOCVTable4",  .offset = 40, .bytes = 2, },
+	{ .name = "nOCVTable5",  .offset = 42, .bytes = 2, },
+	{ .name = "nOCVTable6",  .offset = 44, .bytes = 2, },
+	{ .name = "nOCVTable7",  .offset = 46, .bytes = 2, },
+	{ .name = "nOCVTable8",  .offset = 48, .bytes = 2, },
+	{ .name = "nOCVTable9",  .offset = 50, .bytes = 2, },
+	{ .name = "nOCVTable10", .offset = 52, .bytes = 2, },
+	{ .name = "nOCVTable11", .offset = 54, .bytes = 2, },
+	{ .name = "nIChgTerm",   .offset = 56, .bytes = 2, },
+	{ .name = "nFilterCfg",  .offset = 58, .bytes = 2, },
+	{ .name = "nVEmpty",     .offset = 60, .bytes = 2, },
+	{ .name = "nLearnCfg",   .offset = 62, .bytes = 2, },
+
+	{ .name = "nQRTable00",  .offset = 64, .bytes = 2, },
+	{ .name = "nQRTable10",  .offset = 66, .bytes = 2, },
+	{ .name = "nQRTable20",  .offset = 68, .bytes = 2, },
+	{ .name = "nQRTable30",  .offset = 70, .bytes = 2, },
+	{ .name = "nCycles",     .offset = 72, .bytes = 2, },
+	{ .name = "nFullCapNom", .offset = 74, .bytes = 2, },
+	{ .name = "nRComp0",     .offset = 76, .bytes = 2, },
+	{ .name = "nTempCo",     .offset = 78, .bytes = 2, },
+	{ .name = "nIAvgEmpty",  .offset = 80, .bytes = 2, },
+	{ .name = "nFullCapRep", .offset = 82, .bytes = 2, },
+	{ .name = "nVoltTemp",   .offset = 84, .bytes = 2, },
+	{ .name = "nMaxMinCurr", .offset = 86, .bytes = 2, },
+	{ .name = "nMaxMinVolt", .offset = 88, .bytes = 2, },
+	{ .name = "nMaxMinTemp", .offset = 90, .bytes = 2, },
+	{ .name = "nSOC",        .offset = 92, .bytes = 2, },
+	{ .name = "nTimerH",     .offset = 94, .bytes = 2, },
+
+	{ .name = "nConfig",    .offset = 96,  .bytes = 2, },
+	{ .name = "nRippleCfg", .offset = 98,  .bytes = 2, },
+	{ .name = "nMiscCfg",   .offset = 100, .bytes = 2, },
+	{ .name = "nDesignCap", .offset = 102, .bytes = 2, },
+	{ .name = "nHibCfg",    .offset = 104, .bytes = 2, },
+	{ .name = "nPackCfg",   .offset = 106, .bytes = 2, },
+	{ .name = "nRelaxCfg",  .offset = 108, .bytes = 2, },
+	{ .name = "nConvgCfg",  .offset = 110, .bytes = 2, },
+	{ .name = "nNVCfg0",    .offset = 112, .bytes = 2, },
+	{ .name = "nNVCfg1",    .offset = 114, .bytes = 2, },
+	{ .name = "nNVCfg2",    .offset = 116, .bytes = 2, },
+	{ .name = "nSBSCfg",    .offset = 118, .bytes = 2, },
+	{ .name = "nROMID0",    .offset = 120, .bytes = 2, },
+	{ .name = "nROMID1",    .offset = 122, .bytes = 2, },
+	{ .name = "nROMID2",    .offset = 124, .bytes = 2, },
+	{ .name = "nROMID3",    .offset = 126, .bytes = 2, },
+
+	{ .name = "nVAlrtTh",      .offset = 128, .bytes = 2, },
+	{ .name = "nTAlrtTh",      .offset = 130, .bytes = 2, },
+	{ .name = "nSAlrtTh",      .offset = 132, .bytes = 2, },
+	{ .name = "nIAlrtTh",      .offset = 134, .bytes = 2, },
+	{ .name = "nUser1C4",      .offset = 136, .bytes = 2, },
+	{ .name = "nUser1C5",      .offset = 138, .bytes = 2, },
+	{ .name = "nFullSOCThr",   .offset = 140, .bytes = 2, },
+	{ .name = "nTTFCfg",       .offset = 142, .bytes = 2, },
+	{ .name = "nCGain",        .offset = 144, .bytes = 2, },
+	{ .name = "nTCurve",       .offset = 146, .bytes = 2, },
+	{ .name = "nTGain",        .offset = 148, .bytes = 2, },
+	{ .name = "nTOff",         .offset = 150, .bytes = 2, },
+	{ .name = "nManfctrName0", .offset = 152, .bytes = 2, },
+	{ .name = "nManfctrName1", .offset = 154, .bytes = 2, },
+	{ .name = "nManfctrName2", .offset = 156, .bytes = 2, },
+	{ .name = "nRSense",       .offset = 158, .bytes = 2, },
+
+	{ .name = "nUser1D0",       .offset = 160, .bytes = 2, },
+	{ .name = "nUser1D1",       .offset = 162, .bytes = 2, },
+	{ .name = "nAgeFcCfg",      .offset = 164, .bytes = 2, },
+	{ .name = "nDesignVoltage", .offset = 166, .bytes = 2, },
+	{ .name = "nUser1D4",       .offset = 168, .bytes = 2, },
+	{ .name = "nRFastVShdn",    .offset = 170, .bytes = 2, },
+	{ .name = "nManfctrDate",   .offset = 172, .bytes = 2, },
+	{ .name = "nFirstUsed",     .offset = 174, .bytes = 2, },
+	{ .name = "nSerialNumber0", .offset = 176, .bytes = 2, },
+	{ .name = "nSerialNumber1", .offset = 178, .bytes = 2, },
+	{ .name = "nSerialNumber2", .offset = 180, .bytes = 2, },
+	{ .name = "nDeviceName0",   .offset = 182, .bytes = 2, },
+	{ .name = "nDeviceName1",   .offset = 184, .bytes = 2, },
+	{ .name = "nDeviceName2",   .offset = 186, .bytes = 2, },
+	{ .name = "nDeviceName3",   .offset = 188, .bytes = 2, },
+	{ .name = "nDeviceName4",   .offset = 190, .bytes = 2, },
+};
+
+static const enum power_supply_property max1720x_battery_props[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
@@ -6078,6 +6189,47 @@ static const struct power_supply_desc max1720x_fg_desc = {
 	.property_is_writeable = max1720x_property_is_writeable,
 };
 
+static int max1720x_nvmem_reg_read(void *data, unsigned int off, void *val, size_t len)
+{
+	struct max1720x_priv *priv = data;
+	unsigned int reg = 0x100 | (MAX1720X_NXTABLE0 + off / 2);
+	unsigned int word;
+	int ret;
+
+	while (len) {
+		ret = max1720x_regmap_read(priv, reg++, &word);
+		if (ret < 0)
+			return ret;
+
+		put_unaligned((u16)word, (u16 *)val);
+		val += sizeof(u16);
+		len -= sizeof(u16);
+	}
+
+	return 0;
+}
+
+static int max1720x_probe_nvmem(struct max1720x_priv *priv)
+{
+	struct nvmem_config config = {
+		.dev = priv->dev,
+		.name = "max1720x_nvmem",
+		.cells = max1720x_nvmem_cells,
+		.ncells = ARRAY_SIZE(max1720x_nvmem_cells),
+		.read_only = true,
+		.root_only = true,
+		.reg_read = max1720x_nvmem_reg_read,
+		.size = (MAX1720X_NDEVICE_NAME4 - MAX1720X_NXTABLE0 + 1) * 2,
+		.word_size = 2,
+		.stride = 2,
+		.priv = priv,
+	};
+	struct nvmem_device *nvmem;
+
+	nvmem = devm_nvmem_register(priv->dev, &config);
+	return PTR_ERR_OR_ZERO(nvmem);
+}
+
 static int max1720x_probe(struct i2c_client *client)
 {
 	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
@@ -6121,10 +6273,17 @@ static int max1720x_probe(struct i2c_client *client)
 	if (IS_ERR(priv->regmap))
 		return PTR_ERR(priv->regmap);
 
+	if (priv->driver_data == ID_MAX1720X) {
+		ret = max1720x_probe_nvmem(priv);
+		if (ret)
+			return dev_err_probe(priv->dev, ret, "Failed to probe nvmem\n");
+	}
+
 	INIT_WORK(&priv->init_worker, max1720x_init_worker);
 	schedule_work(&priv->init_worker);
 
 	psy_cfg.drv_data = priv;
+	psy_cfg.fwnode = dev_fwnode(priv->dev);
 	priv->battery = power_supply_register(&client->dev, &max1720x_fg_desc, &psy_cfg);
 	if (IS_ERR(priv->battery)) {
 		ret = PTR_ERR(priv->battery);

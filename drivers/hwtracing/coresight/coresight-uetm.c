@@ -881,11 +881,15 @@ static void uetm_store_config(struct uetm_drvdata *drvdata)
 	mb();
 }
 static int uetm_enable(struct coresight_device *csdev,
-			struct perf_event *event, enum cs_mode mode)
+			struct perf_event *event, enum cs_mode mode,
+			__maybe_unused struct coresight_trace_id_map *id_map)
 {
 	struct uetm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	struct uetm_reg_config *config = drvdata->config;
 	int ret, trace_id;
+
+	if (mode != CS_MODE_SYSFS)
+		return -EINVAL;
 
 	if (!coresight_take_mode(csdev, mode)) {
 		dev_err(&csdev->dev,

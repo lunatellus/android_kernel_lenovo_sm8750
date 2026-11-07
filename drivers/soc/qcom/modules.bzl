@@ -1450,6 +1450,7 @@ def register_modules(registry):
         srcs = [
             # do not sort
             "drivers/soc/qcom/smp2p.c",
+            "drivers/soc/qcom/trace-smp2p.h",
         ],
         deps = [
             # do not sort

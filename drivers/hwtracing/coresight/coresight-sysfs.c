@@ -11,6 +11,7 @@
 
 #include "coresight-priv.h"
 #include "coresight-common.h"
+#include "coresight-trace-id.h"
 
 ssize_t coresight_simple_show_pair(struct device *_dev,
 			      struct device_attribute *attr, char *buf)
@@ -52,7 +53,7 @@ static int coresight_enable_source_sysfs(struct coresight_device *csdev,
 	 */
 	lockdep_assert_held(&coresight_mutex);
 	if (coresight_get_mode(csdev) != CS_MODE_SYSFS) {
-		ret = source_ops(csdev)->enable(csdev, data, mode);
+		ret = source_ops(csdev)->enable(csdev, data, mode, NULL);
 		if (ret)
 			return ret;
 	}

@@ -214,7 +214,7 @@ struct arm_smmu_device {
 #define ARM_SMMU_OPT_MSIPOLL		(1 << 2)
 #define ARM_SMMU_OPT_CMDQ_FORCE_SYNC	(1 << 3)
 #define ARM_SMMU_OPT_TEGRA241_CMDQV	(1 << 4)
-#define ARM_SMMU_OPT_VIRTIO		(1 << 4)
+#define ARM_SMMU_OPT_VIRTIO		(1 << 5)
 	u32				options;
 
 	struct arm_smmu_cmdq		cmdq;
@@ -253,6 +253,16 @@ struct arm_smmu_stream {
 	u32				id;
 	struct arm_smmu_master		*master;
 	struct rb_node			node;
+};
+
+struct arm_smmu_event {
+	u8				ssv : 1,
+					read : 1;
+	u8				id;
+	u32				sid;
+	u32				ssid;
+	u64				iova;
+	struct device			*dev;
 };
 
 /* SMMU private data for each master */

@@ -34,6 +34,8 @@
 #include <linux/sched/walt.h>
 #endif
 #include <linux/nvmem-consumer.h>
+#include <linux/time.h>
+#include <linux/units.h>
 
 #include <soc/qcom/ice.h>
 
@@ -200,7 +202,7 @@ static struct ufs_qcom_host *ufs_qcom_hosts[MAX_UFS_QCOM_HOSTS];
 static void ufs_qcom_get_default_testbus_cfg(struct ufs_qcom_host *host);
 static unsigned long ufs_qcom_opp_freq_to_clk_freq(struct ufs_hba *hba,
 						   unsigned long freq, char *name);
-static int ufs_qcom_core_clk_ctrl(struct ufs_hba *hba, bool is_scale_up, unsigned long freq);
+static int ufs_qcom_core_clk_ctrl(struct ufs_hba *hba, unsigned long freq);
 static void ufs_qcom_parse_limits(struct ufs_qcom_host *host);
 static void ufs_qcom_parse_lpm(struct ufs_qcom_host *host);
 static void ufs_qcom_parse_wb(struct ufs_qcom_host *host);
@@ -645,7 +647,7 @@ static int ufs_qcom_ice_init(struct ufs_qcom_host *host)
 	struct device *dev = hba->dev;
 	struct qcom_ice *ice;
 
-	ice = of_qcom_ice_get(dev);
+	ice = devm_of_qcom_ice_get(dev);
 	if (ice == ERR_PTR(-EOPNOTSUPP)) {
 		dev_warn(dev, "Disabling inline encryption support\n");
 		ice = NULL;
@@ -692,8 +694,9 @@ static int ufs_qcom_ice_program_key(struct ufs_hba *hba,
 {
 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
 	union ufs_crypto_cap_entry cap;
-	bool config_enable =
-		cfg->config_enable & UFS_CRYPTO_CONFIGURATION_ENABLE;
+
+	if (!(cfg->config_enable & UFS_CRYPTO_CONFIGURATION_ENABLE))
+		return qcom_ice_evict_key(host->ice, slot);
 
 	/* Only AES-256-XTS has been tested so far. */
 	cap = hba->crypto_cap_array[cfg->crypto_cap_idx];
@@ -701,14 +704,11 @@ static int ufs_qcom_ice_program_key(struct ufs_hba *hba,
 	    cap.key_size != UFS_CRYPTO_KEY_SIZE_256)
 		return -EOPNOTSUPP;
 
-	if (config_enable)
-		return qcom_ice_program_key(host->ice,
-					    QCOM_ICE_CRYPTO_ALG_AES_XTS,
-					    QCOM_ICE_CRYPTO_KEY_SIZE_256,
-					    cfg->crypto_key,
-					    cfg->data_unit_size, slot);
-	else
-		return qcom_ice_evict_key(host->ice, slot);
+	return qcom_ice_program_key(host->ice,
+				    QCOM_ICE_CRYPTO_ALG_AES_XTS,
+				    QCOM_ICE_CRYPTO_KEY_SIZE_256,
+				    cfg->crypto_key,
+				    cfg->data_unit_size, slot);
 }
 
 #else
@@ -1337,7 +1337,7 @@ static int ufs_qcom_set_dme_vs_core_clk_ctrl_max_freq_mode(struct ufs_hba *hba)
 		}
 	}
 
-	return ufs_qcom_core_clk_ctrl(hba, true, max_freq);
+	return ufs_qcom_core_clk_ctrl(hba, max_freq);
 }
 
 /**
@@ -4244,7 +4244,7 @@ static int __ufs_qcom_core_clk_ctrl(struct ufs_hba *hba, u32 clk_1us_cycles,
 	return err;
 }
 
-static int ufs_qcom_core_clk_ctrl(struct ufs_hba *hba, bool is_scale_up, unsigned long freq)
+static int ufs_qcom_core_clk_ctrl(struct ufs_hba *hba, unsigned long freq)
 {
 	u32 clk_1us_cycles, clk_40ns_cycles;
 	struct list_head *head = &hba->clk_list_head;
@@ -4266,10 +4266,7 @@ static int ufs_qcom_core_clk_ctrl(struct ufs_hba *hba, bool is_scale_up, unsigne
 				break;
 			}
 
-			if (is_scale_up)
-				clk_freq = clki->max_freq;
-			else
-				clk_freq = clk_get_rate(clki->clk);
+			clk_freq = freq;
 			break;
 		}
 	}
@@ -4308,7 +4305,7 @@ set_core_clk_ctrl:
 		return ret;
 	}
 
-	clk_1us_cycles = freq_ceil(clk_freq, (1000 * 1000));
+	clk_1us_cycles = freq_ceil(clk_freq, HZ_PER_MHZ);
 	ret = __ufs_qcom_core_clk_ctrl(hba, clk_1us_cycles, clk_40ns_cycles);
 	if (ret)
 		dev_err(hba->dev, "failed to set core clk ctrl for clk freq %lu, err %d\n",
@@ -4327,7 +4324,7 @@ static int ufs_qcom_clk_scale_up_pre_change(struct ufs_hba *hba, unsigned long f
 		return err;
 	}
 
-	return ufs_qcom_core_clk_ctrl(hba, true, freq);
+	return ufs_qcom_core_clk_ctrl(hba, freq);
 }
 
 static int ufs_qcom_clk_scale_up_post_change(struct ufs_hba *hba)
@@ -4358,7 +4355,7 @@ static int ufs_qcom_clk_scale_down_post_change(struct ufs_hba *hba, unsigned lon
 	if (attr)
 		ufs_qcom_cfg_timers(hba, false);
 
-	return ufs_qcom_core_clk_ctrl(hba, false, freq);
+	return ufs_qcom_core_clk_ctrl(hba, freq);
 }
 
 static int ufs_qcom_clk_scale_notify(struct ufs_hba *hba, bool scale_up,
@@ -5547,7 +5544,7 @@ static unsigned long ufs_qcom_opp_freq_to_clk_freq(struct ufs_hba *hba,
 
 static u32 ufs_qcom_freq_to_gear_speed(struct ufs_hba *hba, unsigned long freq)
 {
-	u32 gear = 0;
+	u32 gear = UFS_HS_DONT_CHANGE;
 	unsigned long unipro_freq;
 
 	if (!hba->use_pm_opp)
@@ -6445,7 +6442,6 @@ static void ufs_qcom_remove(struct platform_device *pdev)
 		r = host->ufs_qos;
 		qcg = r->qcg;
 
-		pm_runtime_get_sync(&(pdev)->dev);
 		for (i = 0; i < r->num_groups; i++, qcg++)
 			remove_group_qos(qcg);
 	}
@@ -6453,8 +6449,9 @@ static void ufs_qcom_remove(struct platform_device *pdev)
 		atomic_notifier_chain_unregister(&panic_notifier_list,
 				&host->ufs_qcom_panic_nb);
 
-	ufshcd_remove(hba);
-	platform_device_msi_free_irqs_all(hba->dev);
+	ufshcd_pltfrm_remove(pdev);
+	if (host->esi_enabled)
+		platform_device_msi_free_irqs_all(hba->dev);
 }
 
 static void ufs_qcom_shutdown(struct platform_device *pdev)

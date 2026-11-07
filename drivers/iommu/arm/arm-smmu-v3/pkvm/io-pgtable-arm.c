@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
+ * Copyright (C) 2022 Arm Ltd.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <asm/kvm_hyp.h>
@@ -105,10 +106,19 @@ struct io_pgtable *kvm_arm_io_pgtable_alloc(struct io_pgtable_cfg *cfg,
 	struct arm_lpae_io_pgtable *data;
 	int ret;
 
-	data = kvm_iommu_donate_pages_atomic(0);
-	if (!data) {
-		*out_ret = -ENOMEM;
-		return NULL;
+	if (idmapped) {
+		data = kvm_iommu_donate_pages_atomic(0);
+		if (!data) {
+			*out_ret = -ENOMEM;
+			return NULL;
+		}
+	} else {
+		data = hyp_alloc(sizeof(*data));
+		if (!data) {
+			kvm_iommu_request_hyp_alloc();
+			*out_ret = hyp_alloc_errno();
+			return NULL;
+		}
 	}
 
 	data->idmapped = idmapped;
@@ -117,8 +127,6 @@ struct io_pgtable *kvm_arm_io_pgtable_alloc(struct io_pgtable_cfg *cfg,
 		goto out_free;
 
 	pgd_size = PAGE_ALIGN(ARM_LPAE_PGD_SIZE(data));
-
-	data->idmapped = idmapped;
 	data->pgd = __arm_lpae_alloc_pages(pgd_size, 0, &data->iop.cfg, cookie);
 	if (!data->pgd) {
 		ret = -ENOMEM;
@@ -152,6 +160,10 @@ struct io_pgtable *kvm_arm_io_pgtable_alloc(struct io_pgtable_cfg *cfg,
 	*out_ret = 0;
 	return &data->iop;
 out_free:
+	if (idmapped)
+		kvm_iommu_reclaim_pages_atomic(data, 0);
+	else
+		hyp_free(data);
 	*out_ret = ret;
 	return NULL;
 }
@@ -166,6 +178,9 @@ int kvm_arm_io_pgtable_free(struct io_pgtable *iopt)
 
 	io_pgtable_tlb_flush_all(iopt);
 	__arm_lpae_free_pgtable(data, data->start_level, data->pgd);
-	hyp_free(data);
+	if (data->idmapped)
+		kvm_iommu_reclaim_pages_atomic(data, 0);
+	else
+		hyp_free(data);
 	return 0;
 }

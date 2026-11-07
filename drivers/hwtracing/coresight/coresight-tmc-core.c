@@ -1133,10 +1133,10 @@ static int tmc_runtime_suspend(struct device *dev)
 	struct tmc_drvdata *drvdata = dev_get_drvdata(dev);
 
 	if (drvdata) {
-		if (!IS_ERR_OR_NULL(drvdata->pclk))
-			clk_disable_unprepare(drvdata->pclk);
 		if (!IS_ERR(drvdata->atclk))
 			clk_disable_unprepare(drvdata->atclk);
+		if (!IS_ERR_OR_NULL(drvdata->pclk))
+			clk_disable_unprepare(drvdata->pclk);
 	}
 	return 0;
 }
@@ -1144,12 +1144,24 @@ static int tmc_runtime_suspend(struct device *dev)
 static int tmc_runtime_resume(struct device *dev)
 {
 	struct tmc_drvdata *drvdata = dev_get_drvdata(dev);
+	int ret;
 
-	if (drvdata) {
-		if (!IS_ERR_OR_NULL(drvdata->pclk))
-			clk_prepare_enable(drvdata->pclk);
-		if (!IS_ERR(drvdata->atclk))
-			clk_prepare_enable(drvdata->atclk);
+	if (!drvdata)
+		return 0;
+
+	if (!IS_ERR_OR_NULL(drvdata->pclk)) {
+		ret = clk_prepare_enable(drvdata->pclk);
+		if (ret)
+			return ret;
+	}
+
+	if (!IS_ERR(drvdata->atclk)) {
+		ret = clk_prepare_enable(drvdata->atclk);
+		if (ret) {
+			if (!IS_ERR_OR_NULL(drvdata->pclk))
+				clk_disable_unprepare(drvdata->pclk);
+			return ret;
+		}
 	}
 	return 0;
 }
@@ -1240,7 +1252,10 @@ static int __init tmc_init(void)
 	if (ret)
 		return ret;
 
-	return coresight_init_driver("tmc", &tmc_driver, &tmc_platform_driver);
+	ret = coresight_init_driver("tmc", &tmc_driver, &tmc_platform_driver, THIS_MODULE);
+	if (ret)
+		tmc_pm_clear();
+	return ret;
 }
 
 static void __exit tmc_exit(void)

@@ -186,13 +186,15 @@ struct etr_buf {
 
 /**
  * struct tmc_drvdata - specifics associated to an TMC component
+ * @atclk:	optional clock for the core parts of the TMC.
  * @pclk:	APB clock if present, otherwise NULL
  * @base:	memory mapped base address for this component.
  * @csdev:	component vitals needed by the framework.
  * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
  * @spinlock:	only one at a time pls.
- * @pid:	Process ID of the process being monitored by the session
- *		that is using this component.
+ * @pid:	Process ID of the process that owns the session that is using
+ *		this component. For example this would be the pid of the Perf
+ *		process.
  * @buf:	Snapshot of the trace data for ETF/ETB.
  * @etr_buf:	details of buffer used in TMC-ETR
  * @len:	size of the available trace for ETF/ETB.
@@ -216,9 +218,9 @@ struct etr_buf {
  * @usb_data:	usb data for ETR.
  * @stop_on_flush: flag of stop_on_flush for ETR.
  * @delayed:	parameter for delayed probe.
- * @atclk:	optional clock for the core parts of the TMC.
  */
 struct tmc_drvdata {
+	struct clk		*atclk;
 	struct clk		*pclk;
 	void __iomem		*base;
 	struct coresight_device	*csdev;
@@ -252,7 +254,6 @@ struct tmc_drvdata {
 	struct tmc_usb_data	*usb_data;
 	bool			stop_on_flush;
 	struct delay_probe_arg	*delayed;
-	struct clk		*atclk;
 	struct pm_config	pm_config;
 	struct list_head	link;
 };

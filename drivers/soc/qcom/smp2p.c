@@ -176,6 +176,9 @@ static void *ilc;
 #define SMP2P_INFO(x, ...)	\
 	ipc_log_string(ilc, "[%s]: "x, __func__, ##__VA_ARGS__)
 
+#define CREATE_TRACE_POINTS
+#include "trace-smp2p.h"
+
 static void qcom_smp2p_kick(struct qcom_smp2p *smp2p)
 {
 	/* Make sure any updated data is written before the kick */
@@ -217,6 +220,7 @@ static void qcom_smp2p_do_ssr_ack(struct qcom_smp2p *smp2p)
 	u32 val;
 
 	SMP2P_INFO("%d: SSR detected, doing SSR Handshake\n", smp2p->remote_pid);
+	trace_smp2p_ssr_ack(smp2p->dev);
 	smp2p->ssr_ack = !smp2p->ssr_ack;
 
 	val = out->flags & ~BIT(SMP2P_FLAGS_RESTART_ACK_BIT);
@@ -242,6 +246,7 @@ static void qcom_smp2p_negotiate(struct qcom_smp2p *smp2p)
 		smp2p->negotiation_done = true;
 		SMP2P_INFO("%d: state=open ssr_ack=%d\n", smp2p->remote_pid,
 			   smp2p->ssr_ack_enabled);
+		trace_smp2p_negotiate(smp2p->dev, out->features);
 	}
 }
 
@@ -344,6 +349,7 @@ static void qcom_smp2p_notify_in(struct qcom_smp2p *smp2p)
 
 		SMP2P_INFO("%d:\t%s: status:%0lx val:%0x\n",
 			   smp2p->remote_pid, entry->name, status, val);
+		trace_smp2p_notify_in(entry, status, val);
 
 		/* No changes of this entry? */
 		if (!status)
@@ -546,6 +552,8 @@ static int smp2p_update_bits(void *data, u32 mask, u32 value)
 	SMP2P_INFO("%d: %s: orig:0x%0x new:0x%0x\n",
 		   entry->smp2p->remote_pid, entry->name, orig, val);
 
+	trace_smp2p_update_bits(entry, orig, val);
+
 	if (val != orig)
 		qcom_smp2p_kick(entry->smp2p);
 
@@ -665,7 +673,6 @@ static int qcom_smp2p_probe(struct platform_device *pdev)
 {
 	struct smp2p_entry *entry;
 	struct smp2p_entry *next_entry;
-	struct device_node *node;
 	struct qcom_smp2p *smp2p;
 	const char *key;
 	int irq;
@@ -708,7 +715,7 @@ static int qcom_smp2p_probe(struct platform_device *pdev)
 	smp2p->mbox_client.knows_txdone = true;
 	smp2p->mbox_chan = mbox_request_channel(&smp2p->mbox_client, 0);
 	if (IS_ERR(smp2p->mbox_chan)) {
-		if (PTR_ERR(smp2p->mbox_chan) != -ENODEV)
+		if (PTR_ERR(smp2p->mbox_chan) != -ENOENT)
 			return PTR_ERR(smp2p->mbox_chan);
 
 		smp2p->mbox_chan = NULL;
@@ -722,11 +729,10 @@ static int qcom_smp2p_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto release_mbox;
 
-	for_each_available_child_of_node(pdev->dev.of_node, node) {
+	for_each_available_child_of_node_scoped(pdev->dev.of_node, node) {
 		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
 		if (!entry) {
 			ret = -ENOMEM;
-			of_node_put(node);
 			goto unwind_interfaces;
 		}
 
@@ -734,25 +740,19 @@ static int qcom_smp2p_probe(struct platform_device *pdev)
 		spin_lock_init(&entry->lock);
 
 		ret = of_property_read_string(node, "qcom,entry-name", &entry->name);
-		if (ret < 0) {
-			of_node_put(node);
-			goto unwind_interfaces;
-		}
+		if (ret < 0)
+			goto free_entry;
 
 		if (of_property_read_bool(node, "interrupt-controller")) {
 			ret = qcom_smp2p_inbound_entry(smp2p, entry, node);
-			if (ret < 0) {
-				of_node_put(node);
-				goto unwind_interfaces;
-			}
+			if (ret < 0)
+				goto free_entry;
 
 			list_add(&entry->node, &smp2p->inbound);
 		} else  {
 			ret = qcom_smp2p_outbound_entry(smp2p, entry, node);
-			if (ret < 0) {
-				of_node_put(node);
-				goto unwind_interfaces;
-			}
+			if (ret < 0)
+				goto free_entry;
 
 			list_add(&entry->node, &smp2p->outbound);
 		}
@@ -819,6 +819,10 @@ release_mbox:
 
 	return ret;
 
+free_entry:
+	kfree(entry);
+	goto unwind_interfaces;
+
 report_read_failure:
 	dev_err(&pdev->dev, "failed to read %s\n", key);
 	return -EINVAL;
@@ -854,7 +858,6 @@ static int qcom_smp2p_restore(struct device *dev)
 	int ret = 0;
 	struct qcom_smp2p *smp2p = dev_get_drvdata(dev);
 	struct smp2p_entry *entry;
-	struct device_node *node;
 	struct platform_device *pdev = container_of(dev, struct
 					platform_device, dev);
 
@@ -862,7 +865,7 @@ static int qcom_smp2p_restore(struct device *dev)
 	if (ret < 0)
 		goto print_err;
 
-	for_each_available_child_of_node(pdev->dev.of_node, node) {
+	for_each_available_child_of_node_scoped(pdev->dev.of_node, node) {
 		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
 		if (!entry) {
 			ret = -ENOMEM;
@@ -940,7 +943,7 @@ MODULE_DEVICE_TABLE(of, qcom_smp2p_of_match);
 
 static struct platform_driver qcom_smp2p_driver = {
 	.probe = qcom_smp2p_probe,
-	.remove_new = qcom_smp2p_remove,
+	.remove = qcom_smp2p_remove,
 	.driver  = {
 		.name  = "qcom_smp2p",
 		.of_match_table = qcom_smp2p_of_match,

@@ -128,6 +128,7 @@
 #define FFA_FEAT_RXTX_MIN_SZ_4K		0
 #define FFA_FEAT_RXTX_MIN_SZ_64K	1
 #define FFA_FEAT_RXTX_MIN_SZ_16K	2
+#define FFA_FEAT_RXTX_MIN_SZ_MASK	GENMASK(1, 0)
 
 /* FFA Bus/Device/Driver related */
 struct ffa_device {
@@ -242,11 +243,18 @@ struct ffa_partition_info {
 #define FFA_PARTITION_INDIRECT_MSG	BIT(2)
 /* partition can receive notifications */
 #define FFA_PARTITION_NOTIFICATION_RECV	BIT(3)
+/* partition must be informed about each VM that is created by the Hypervisor */
+#define FFA_PARTITION_HYP_CREATE_VM	BIT(6)
+/* partition must be informed about each VM that is destroyed by the Hypervisor */
+#define FFA_PARTITION_HYP_DESTROY_VM	BIT(7)
 /* partition runs in the AArch64 execution state. */
 #define FFA_PARTITION_AARCH64_EXEC	BIT(8)
 	u32 properties;
 	uuid_t uuid;
 };
+
+#define FFA_VM_CREATION_MSG	(BIT(31) | (BIT(2)))
+#define FFA_VM_DESTRUCTION_MSG  (FFA_VM_CREATION_MSG | BIT(1))
 
 static inline
 bool ffa_partition_check_property(struct ffa_device *dev, u32 property)
@@ -262,6 +270,8 @@ bool ffa_partition_check_property(struct ffa_device *dev, u32 property)
 
 #define ffa_partition_supports_direct_recv(dev)	\
 	ffa_partition_check_property(dev, FFA_PARTITION_DIRECT_RECV)
+
+#define FFA_SRC_ENDPOINT_MASK	GENMASK(31, 16)
 
 /* For use with FFA_MSG_SEND_DIRECT_{REQ,RESP} which pass data via registers */
 struct ffa_send_direct_data {
@@ -414,6 +424,13 @@ struct ffa_mem_region {
 #define FFA_EMAD_HAS_IMPDEF_FIELD(version)	((version) >= FFA_VERSION_1_2)
 #define FFA_MEM_REGION_HAS_EP_MEM_OFFSET(version) ((version) > FFA_VERSION_1_0)
 
+/* The layout changed from FFA_VERSION_1_0 and the region includes an
+ * ep_mem_offset.
+ */
+#define FFA_MEM_REGION_SZ(version)		(!FFA_MEM_REGION_HAS_EP_MEM_OFFSET((version)) ?\
+						 offsetof(struct ffa_mem_region, ep_mem_offset) :\
+						 sizeof(struct ffa_mem_region))
+
 static inline u32 ffa_emad_size_get(u32 ffa_version)
 {
 	u32 sz;
@@ -438,7 +455,7 @@ ffa_mem_desc_offset(struct ffa_mem_region *buf, int count, u32 ffa_version)
 	if (!FFA_MEM_REGION_HAS_EP_MEM_OFFSET(ffa_version))
 		offset += offsetof(struct ffa_mem_region, ep_mem_offset);
 	else
-		offset += sizeof(struct ffa_mem_region);
+		offset += buf->ep_mem_offset;
 
 	return offset;
 }
@@ -464,7 +481,7 @@ struct ffa_msg_ops {
 	int (*sync_send_receive)(struct ffa_device *dev,
 				 struct ffa_send_direct_data *data);
 	int (*indirect_send)(struct ffa_device *dev, void *buf, size_t sz);
-	int (*sync_send_receive2)(struct ffa_device *dev,
+	int (*sync_send_receive2)(struct ffa_device *dev, const uuid_t *uuid,
 				  struct ffa_send_direct_data2 *data);
 };
 
@@ -527,6 +544,16 @@ static inline int ffa_to_linux_errno(int errno)
 	if (err_idx >= 0 && err_idx < ARRAY_SIZE(ffa_linux_errmap))
 		return ffa_linux_errmap[err_idx];
 	return -EINVAL;
+}
+
+static inline int linux_errno_to_ffa(int errno)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(ffa_linux_errmap); i++)
+		if (ffa_linux_errmap[i] == errno)
+			return -i;
+	return FFA_RET_NOT_SUPPORTED;
 }
 
 #endif /* _LINUX_ARM_FFA_H */

@@ -35,16 +35,18 @@
 PHONY := __modpost
 __modpost:
 
-include include/config/auto.conf
+include $(objtree)/include/config/auto.conf
 include $(srctree)/scripts/Kbuild.include
 
 mixed-build-prefix = $(if $(KBUILD_MIXED_TREE),$(KBUILD_MIXED_TREE)/)
 
-MODPOST = scripts/mod/modpost
+MODPOST = $(objtree)/scripts/mod/modpost
 
 modpost-args =										\
 	$(if $(CONFIG_MODULES),-M)							\
 	$(if $(CONFIG_MODVERSIONS),-m)							\
+	$(if $(CONFIG_BASIC_MODVERSIONS),-b)						\
+	$(if $(CONFIG_EXTENDED_MODVERSIONS),-x)						\
 	$(if $(CONFIG_MODULE_SRCVERSION_ALL),-a)					\
 	$(if $(CONFIG_SECTION_MISMATCH_WARN_ONLY),,-E)					\
 	$(if $(KBUILD_MODPOST_WARN),-w)							\
@@ -185,16 +187,23 @@ include $(kbuild-file)
 
 output-symdump := $(KBUILD_EXTMOD)/Module.symvers
 
-ifeq ($(wildcard Module.symvers),)
-missing-input := Module.symvers
+ifeq ($(wildcard $(objtree)/Module.symvers),)
+missing-input := $(objtree)/Module.symvers
 else
-modpost-args += -i Module.symvers
-modpost-deps += Module.symvers
+modpost-args += -i $(objtree)/Module.symvers
+modpost-deps += $(objtree)/Module.symvers
 endif
 
 modpost-args += -e $(addprefix -i , $(KBUILD_EXTRA_SYMBOLS))
 
 endif # ($(KBUILD_EXTMOD),)
+
+ifdef CONFIG_MODULE_SIG_PROTECT
+mod-protect-list := $(CONFIG_MODULE_SIG_PROTECT_LIST)
+mod-protect-list := $(if $(filter-out /%, $(mod-protect-list)),$(if $(wildcard $(mod-protect-list)),,$(srctree)/))$(mod-protect-list)
+modpost-args += $(addprefix -p , $(mod-protect-list))
+modpost-deps += $(mod-protect-list)
+endif
 
 quiet_cmd_modpost = MODPOST $@
       cmd_modpost = \

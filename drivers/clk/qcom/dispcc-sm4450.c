@@ -213,11 +213,17 @@ static struct clk_rcg2 disp_cc_mdss_ahb_clk_src = {
 	},
 };
 
+static const struct freq_tbl ftbl_disp_cc_mdss_byte0_clk_src[] = {
+	F(19200000, P_BI_TCXO, 1, 0, 0),
+	{ }
+};
+
 static struct clk_rcg2 disp_cc_mdss_byte0_clk_src = {
 	.cmd_rcgr = 0x80f8,
 	.mnd_width = 0,
 	.hid_width = 5,
 	.parent_map = disp_cc_parent_map_0,
+	.freq_tbl = ftbl_disp_cc_mdss_byte0_clk_src,
 	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "disp_cc_mdss_byte0_clk_src",
 		.parent_data = disp_cc_parent_data_0,
@@ -233,11 +239,6 @@ static struct clk_rcg2 disp_cc_mdss_byte0_clk_src = {
 			[VDD_LOW] = 300000000,
 			[VDD_LOW_L1] = 358000000},
 	},
-};
-
-static const struct freq_tbl ftbl_disp_cc_mdss_byte0_clk_src[] = {
-	F(19200000, P_BI_TCXO, 1, 0, 0),
-	{ }
 };
 
 static struct clk_rcg2 disp_cc_mdss_esc0_clk_src = {
@@ -302,6 +303,7 @@ static struct clk_rcg2 disp_cc_mdss_pclk0_clk_src = {
 	.mnd_width = 8,
 	.hid_width = 5,
 	.parent_map = disp_cc_parent_map_0,
+	.freq_tbl = ftbl_disp_cc_mdss_byte0_clk_src,
 	.clkr.hw.init = &(const struct clk_init_data){
 		.name = "disp_cc_mdss_pclk0_clk_src",
 		.parent_data = disp_cc_parent_data_0,
@@ -846,8 +848,8 @@ static int disp_cc_sm4450_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, DISP_CC_MISC_CMD, 0x10, 0x10);
 
 	/* Keep some clocks always enabled */
-	regmap_update_bits(regmap, 0xe070, BIT(0), BIT(0)); /* DISP_CC_SLEEP_CLK */
-	regmap_update_bits(regmap, 0xe054, BIT(0), BIT(0)); /* DISP_CC_XO_CLK */
+	qcom_branch_set_clk_en(regmap, 0xe070); /* DISP_CC_SLEEP_CLK */
+	qcom_branch_set_clk_en(regmap, 0xe054); /* DISP_CC_XO_CLK */
 
 	disp_cc_sm4450_desc.gdscs = NULL;
 	disp_cc_sm4450_desc.num_gdscs = 0;

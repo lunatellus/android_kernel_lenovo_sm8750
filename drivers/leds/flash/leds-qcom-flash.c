@@ -5,9 +5,11 @@
 
 #include <linux/bitfield.h>
 #include <linux/bits.h>
+#include <linux/delay.h>
 #include <linux/leds.h>
 #include <linux/led-class-flash.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
 #include <linux/property.h>
@@ -161,73 +163,73 @@ enum {
 };
 
 static const struct reg_field mvflash_3ch_pmi8998_regs[REG_MAX_COUNT] = {
-	REG_FIELD(0x08, 0, 7),			/* status1	*/
-	REG_FIELD(0x09, 0, 7),			/* status2	*/
-	REG_FIELD(0x0a, 0, 7),			/* status3	*/
-	REG_FIELD_ID(0x40, 0, 7, 3, 1),		/* chan_timer	*/
-	REG_FIELD_ID(0x43, 0, 6, 3, 1),		/* itarget	*/
-	REG_FIELD(0x46, 7, 7),			/* module_en	*/
-	REG_FIELD(0x47, 0, 5),			/* iresolution	*/
-	REG_FIELD_ID(0x49, 0, 2, 3, 1),		/* chan_strobe	*/
-	REG_FIELD(0x4c, 0, 2),			/* chan_en	*/
-	REG_FIELD(0xea, 0, 6),			/* torch_clamp	*/
-	REG_FIELD(0x6f, 0, 1),			/* mitigation_sw */
-	REG_FIELD(0x56, 0, 2),			/* therm_thrsh1 */
-	REG_FIELD(0x57, 0, 2),			/* therm_thrsh2 */
-	REG_FIELD(0x58, 0, 2),			/* therm_thrsh3 */
+	[REG_STATUS1]	= REG_FIELD(0x08, 0, 7),			/* status1	*/
+	[REG_STATUS2]	= REG_FIELD(0x09, 0, 7),			/* status2	*/
+	[REG_STATUS3]	= REG_FIELD(0x0a, 0, 7),			/* status3	*/
+	[REG_CHAN_TIMER]	= REG_FIELD_ID(0x40, 0, 7, 3, 1),		/* chan_timer	*/
+	[REG_ITARGET]	= REG_FIELD_ID(0x43, 0, 6, 3, 1),		/* itarget	*/
+	[REG_MODULE_EN]	= REG_FIELD(0x46, 7, 7),			/* module_en	*/
+	[REG_IRESOLUTION]	= REG_FIELD(0x47, 0, 5),			/* iresolution	*/
+	[REG_CHAN_STROBE]	= REG_FIELD_ID(0x49, 0, 2, 3, 1),		/* chan_strobe	*/
+	[REG_CHAN_EN]	= REG_FIELD(0x4c, 0, 2),			/* chan_en	*/
+	[REG_TORCH_CLAMP]	= REG_FIELD(0xea, 0, 6),			/* torch_clamp	*/
+	[REG_MITIGATION_SW]	= REG_FIELD(0x6f, 0, 1),			/* mitigation_sw */
+	[REG_THERM_THRSH1]	= REG_FIELD(0x56, 0, 2),			/* therm_thrsh1 */
+	[REG_THERM_THRSH2]	= REG_FIELD(0x57, 0, 2),			/* therm_thrsh2 */
+	[REG_THERM_THRSH3]	= REG_FIELD(0x58, 0, 2),			/* therm_thrsh3 */
 };
 
 static const struct reg_field mvflash_3ch_regs[REG_MAX_COUNT] = {
-	REG_FIELD(0x08, 0, 7),			/* status1	*/
-	REG_FIELD(0x09, 0, 7),                  /* status2	*/
-	REG_FIELD(0x0a, 0, 7),                  /* status3	*/
-	REG_FIELD_ID(0x40, 0, 7, 3, 1),         /* chan_timer	*/
-	REG_FIELD_ID(0x43, 0, 6, 3, 1),         /* itarget	*/
-	REG_FIELD(0x46, 7, 7),                  /* module_en	*/
-	REG_FIELD(0x47, 0, 5),                  /* iresolution	*/
-	REG_FIELD_ID(0x49, 0, 2, 3, 1),         /* chan_strobe	*/
-	REG_FIELD(0x4c, 0, 2),                  /* chan_en	*/
-	REG_FIELD(0xec, 0, 6),			/* torch_clamp	*/
-	REG_FIELD(0x6f, 0, 1),			/* mitigation_sw */
-	REG_FIELD(0x56, 0, 2),			/* therm_thrsh1 */
-	REG_FIELD(0x57, 0, 2),			/* therm_thrsh2 */
-	REG_FIELD(0x58, 0, 2),			/* therm_thrsh3 */
+	[REG_STATUS1]	= REG_FIELD(0x08, 0, 7),			/* status1	*/
+	[REG_STATUS2]	= REG_FIELD(0x09, 0, 7),                  /* status2	*/
+	[REG_STATUS3]	= REG_FIELD(0x0a, 0, 7),                  /* status3	*/
+	[REG_CHAN_TIMER]	= REG_FIELD_ID(0x40, 0, 7, 3, 1),         /* chan_timer	*/
+	[REG_ITARGET]	= REG_FIELD_ID(0x43, 0, 6, 3, 1),         /* itarget	*/
+	[REG_MODULE_EN]	= REG_FIELD(0x46, 7, 7),                  /* module_en	*/
+	[REG_IRESOLUTION]	= REG_FIELD(0x47, 0, 5),                  /* iresolution	*/
+	[REG_CHAN_STROBE]	= REG_FIELD_ID(0x49, 0, 2, 3, 1),         /* chan_strobe	*/
+	[REG_CHAN_EN]	= REG_FIELD(0x4c, 0, 2),                  /* chan_en	*/
+	[REG_TORCH_CLAMP]	= REG_FIELD(0xec, 0, 6),			/* torch_clamp	*/
+	[REG_MITIGATION_SW]	= REG_FIELD(0x6f, 0, 1),			/* mitigation_sw */
+	[REG_THERM_THRSH1]	= REG_FIELD(0x56, 0, 2),			/* therm_thrsh1 */
+	[REG_THERM_THRSH2]	= REG_FIELD(0x57, 0, 2),			/* therm_thrsh2 */
+	[REG_THERM_THRSH3]	= REG_FIELD(0x58, 0, 2),			/* therm_thrsh3 */
 };
 
 static const struct reg_field mvflash_4ch_regs[REG_MAX_COUNT] = {
-	REG_FIELD(0x06, 0, 7),			/* status1	*/
-	REG_FIELD(0x07, 0, 6),			/* status2	*/
-	REG_FIELD(0x09, 0, 7),			/* status3	*/
-	REG_FIELD_ID(0x3e, 0, 7, 4, 1),		/* chan_timer	*/
-	REG_FIELD_ID(0x42, 0, 6, 4, 1),		/* itarget	*/
-	REG_FIELD(0x46, 7, 7),			/* module_en	*/
-	REG_FIELD(0x49, 0, 3),			/* iresolution	*/
-	REG_FIELD_ID(0x4a, 0, 6, 4, 1),		/* chan_strobe	*/
-	REG_FIELD(0x4e, 0, 3),			/* chan_en	*/
-	REG_FIELD(0xed, 0, 6),			/* torch_clamp	*/
-	REG_FIELD(0x65, 0, 1),			/* mitigation_sw */
-	REG_FIELD(0x7a, 0, 2),			/* therm_thrsh1 */
-	REG_FIELD(0x78, 0, 2),			/* therm_thrsh2 */
+	[REG_STATUS1]	= REG_FIELD(0x06, 0, 7),			/* status1	*/
+	[REG_STATUS2]	= REG_FIELD(0x07, 0, 6),			/* status2	*/
+	[REG_STATUS3]	= REG_FIELD(0x09, 0, 7),			/* status3	*/
+	[REG_CHAN_TIMER]	= REG_FIELD_ID(0x3e, 0, 7, 4, 1),		/* chan_timer	*/
+	[REG_ITARGET]	= REG_FIELD_ID(0x42, 0, 6, 4, 1),		/* itarget	*/
+	[REG_MODULE_EN]	= REG_FIELD(0x46, 7, 7),			/* module_en	*/
+	[REG_IRESOLUTION]	= REG_FIELD(0x49, 0, 3),			/* iresolution	*/
+	[REG_CHAN_STROBE]	= REG_FIELD_ID(0x4a, 0, 6, 4, 1),		/* chan_strobe	*/
+	[REG_CHAN_EN]	= REG_FIELD(0x4e, 0, 3),			/* chan_en	*/
+	[REG_TORCH_CLAMP]	= REG_FIELD(0xed, 0, 6),			/* torch_clamp	*/
+	[REG_MITIGATION_SW]	= REG_FIELD(0x65, 0, 1),			/* mitigation_sw */
+	[REG_THERM_THRSH1]	= REG_FIELD(0x7a, 0, 2),			/* therm_thrsh1 */
+	[REG_THERM_THRSH2]	= REG_FIELD(0x78, 0, 2),			/* therm_thrsh2 */
 };
 
 static const struct reg_field mvflash_1ch_regs[REG_MAX_COUNT] = {
-	REG_FIELD(0x06, 0, 1),			/* status1      */
-	REG_FIELD(0x07, 0, 6),			/* status2      */
-	REG_FIELD(0x09, 0, 1),			/* status3      */
-	REG_FIELD_ID(0x3e, 0, 7, 1, 1),		/* chan_timer   */
-	REG_FIELD_ID(0x42, 0, 6, 1, 1),		/* itarget      */
-	REG_FIELD(0x46, 7, 7),			/* module_en    */
-	REG_FIELD(0x49, 0, 0),                  /* iresolution  */
-	REG_FIELD_ID(0x4a, 0, 2, 1, 1),		/* chan_strobe  */
-	REG_FIELD(0x4e, 0, 0),			/* chan_en      */
-	REG_FIELD(0xed, 0, 6),			/* torch_clamp  */
-	REG_FIELD(0xff, 0, 0),			/* mitigation sw - just a placeholder
+	[REG_STATUS1]	= REG_FIELD(0x06, 0, 1),			/* status1      */
+	[REG_STATUS2]	= REG_FIELD(0x07, 0, 6),			/* status2      */
+	[REG_STATUS3]	= REG_FIELD(0x09, 0, 1),			/* status3      */
+	[REG_CHAN_TIMER]	= REG_FIELD_ID(0x3e, 0, 7, 1, 1),		/* chan_timer   */
+	[REG_ITARGET]	= REG_FIELD_ID(0x42, 0, 6, 1, 1),		/* itarget      */
+	[REG_MODULE_EN]	= REG_FIELD(0x46, 7, 7),			/* module_en    */
+	[REG_IRESOLUTION]	= REG_FIELD(0x49, 0, 0),                  /* iresolution  */
+	[REG_CHAN_STROBE]	= REG_FIELD_ID(0x4a, 0, 2, 1, 1),		/* chan_strobe  */
+	[REG_CHAN_EN]	= REG_FIELD(0x4e, 0, 0),			/* chan_en      */
+	[REG_TORCH_CLAMP]	= REG_FIELD(0xed, 0, 6),			/* torch_clamp  */
+	[REG_MITIGATION_SW]	= REG_FIELD(0xff, 0, 0),			/* mitigation sw - just a placeholder
 						 * since pm2250 does not support this
 						 * register
 						 */
-	REG_FIELD(0x78, 0, 0),			/* therm_thrsh1 */
-	REG_FIELD(0xff, 0, 0),			/* therm_thrsh2 - placeholder, not used on 1CH */
-	REG_FIELD(0xff, 0, 0),			/* therm_thrsh3 - placeholder, not used on 1CH */
+	[REG_THERM_THRSH1]	= REG_FIELD(0x78, 0, 0),			/* therm_thrsh1 */
+	[REG_THERM_THRSH2]	= REG_FIELD(0xff, 0, 0),			/* therm_thrsh2 - placeholder, not used on 1CH */
+	[REG_THERM_THRSH3]	= REG_FIELD(0xff, 0, 0),			/* therm_thrsh3 - placeholder, not used on 1CH */
 };
 
 struct qcom_flash_data {
@@ -236,7 +238,7 @@ struct qcom_flash_data {
 	struct regmap_field     *r_fields[REG_MAX_COUNT];
 	struct power_supply	*batt_psy;
 	struct iio_channel	**iio_channels;
-	spinlock_t              lock;
+	struct mutex		lock;
 	enum hw_type		hw_type;
 	u32			total_ma;
 	u8			leds_count;
@@ -273,7 +275,7 @@ static int set_flash_module_en(struct qcom_flash_led *led, bool en)
 	for (i = 0; i < led->chan_count; i++)
 		led_mask |= BIT(led->chan_id[i]);
 
-	spin_lock(&flash_data->lock);
+	mutex_lock(&flash_data->lock);
 	if (en)
 		flash_data->chan_en_bits |= led_mask;
 	else
@@ -283,7 +285,7 @@ static int set_flash_module_en(struct qcom_flash_led *led, bool en)
 	rc = regmap_field_write(flash_data->r_fields[REG_MODULE_EN], enable);
 	if (rc)
 		dev_err(led->flash.led_cdev.dev, "write module_en failed, rc=%d\n", rc);
-	spin_unlock(&flash_data->lock);
+	mutex_unlock(&flash_data->lock);
 
 	return rc;
 }
@@ -317,7 +319,7 @@ static int update_allowed_flash_current(struct qcom_flash_led *led, u32 *current
 	u32 therm_ma, avail_ma, thrsh[3], min_thrsh, sts;
 	int rc = 0;
 
-	spin_lock(&flash_data->lock);
+	mutex_lock(&flash_data->lock);
 	/*
 	 * Put previously allocated current into allowed budget in either of these two cases:
 	 * 1) LED is disabled;
@@ -455,7 +457,7 @@ restore:
 		rc = regmap_field_write(flash_data->r_fields[REG_THERM_THRSH3], thrsh[2]);
 
 unlock:
-	spin_unlock(&flash_data->lock);
+	mutex_unlock(&flash_data->lock);
 	return rc;
 }
 
@@ -830,9 +832,9 @@ static int qcom_flash_led_voltage_headroom_get(struct qcom_flash_data *flash_dat
 	if (flash_data->hw_type == QCOM_MVFLASH_3CH)
 		return voltage_hdrm_mv;
 
-	spin_lock(&flash_data->lock);
+	mutex_lock(&flash_data->lock);
 	current_ma = flash_data->total_ma;
-	spin_unlock(&flash_data->lock);
+	mutex_unlock(&flash_data->lock);
 
 	for (i = 0; i < ARRAY_SIZE(mvflash_4ch_map); i++) {
 		if (current_ma <= mvflash_4ch_map[i].current_ma)
@@ -1259,7 +1261,7 @@ static int qcom_flash_led_probe(struct platform_device *pdev)
 	devm_kfree(dev, regs); /* devm_regmap_field_bulk_alloc() makes copies */
 
 	platform_set_drvdata(pdev, flash_data);
-	spin_lock_init(&flash_data->lock);
+	mutex_init(&flash_data->lock);
 
 	count = device_get_child_node_count(dev);
 	if (count == 0 || count > flash_data->max_channels) {

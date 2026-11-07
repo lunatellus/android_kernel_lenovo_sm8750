@@ -253,7 +253,7 @@ int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
 		reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
 
 	smmu->features |= smmu_idr0_features(reg);
-	if (FIELD_GET(IDR0_TTENDIAN, reg) == IDR0_TTENDIAN_RESERVED) {
+	if (!(smmu->features & (ARM_SMMU_FEAT_TT_LE | ARM_SMMU_FEAT_TT_BE))) {
 		dev_err(smmu->dev, "unknown/unsupported TT endianness!\n");
 		return -ENXIO;
 	}
@@ -440,8 +440,7 @@ struct iommu_group *arm_smmu_device_group(struct device *dev)
 
 	/*
 	 * We don't support devices sharing stream IDs other than PCI RID
-	 * pick f473c7c1b189 fixup drv splt * aliases, since the necessary
-	 * ID-to-device lookup becomes rather
+	 * aliases, since the necessary ID-to-device lookup becomes rather
 	 * impractical given a potential sparse 32-bit stream ID space.
 	 */
 	if (dev_is_pci(dev))

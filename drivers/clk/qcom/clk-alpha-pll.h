@@ -43,6 +43,7 @@ enum {
 	CLK_ALPHA_PLL_TYPE_REGERA,
 	CLK_ALPHA_PLL_TYPE_LUCID_5LPE,
 	CLK_ALPHA_PLL_TYPE_ZONDA_5LPE,
+	CLK_ALPHA_PLL_TYPE_NSS_HUAYRA,
 	CLK_ALPHA_PLL_TYPE_MAX,
 };
 
@@ -273,6 +274,8 @@ void clk_pongo_elu_pll_configure(struct clk_alpha_pll *pll, struct regmap *regma
 	clk_pongo_elu_pll_configure(pll, regmap, config)
 
 extern const struct clk_ops clk_regera_pll_ops;
+
+extern const struct clk_ops clk_alpha_pll_regera_ops;
 
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			     const struct alpha_pll_config *config);

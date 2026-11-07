@@ -873,9 +873,9 @@ static int gpu_cc_sm4450_probe(struct platform_device *pdev)
 	regmap_write(regmap, 0x9534, 0x0);
 
 	/* Keep some clocks always enabled */
-	regmap_update_bits(regmap, 0x93a4, BIT(0), BIT(0)); /* GPU_CC_CB_CLK */
-	regmap_update_bits(regmap, 0x9004, BIT(0), BIT(0)); /* GPU_CC_CXO_AON_CLK */
-	regmap_update_bits(regmap, 0x900c, BIT(0), BIT(0)); /* GPU_CC_DEMET_CLK */
+	qcom_branch_set_clk_en(regmap, 0x93a4); /* GPU_CC_CB_CLK */
+	qcom_branch_set_clk_en(regmap, 0x9004); /* GPU_CC_CXO_AON_CLK */
+	qcom_branch_set_clk_en(regmap, 0x900c); /* GPU_CC_DEMET_CLK */
 
 	gpu_cc_sm4450_desc.gdscs = NULL;
 	gpu_cc_sm4450_desc.num_gdscs = 0;

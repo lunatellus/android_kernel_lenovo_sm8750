@@ -476,7 +476,8 @@ static void __tpdm_enable(struct tpdm_drvdata *drvdata)
 }
 
 static int tpdm_enable(struct coresight_device *csdev, struct perf_event *event,
-		       enum cs_mode mode)
+		       enum cs_mode mode,
+		       __maybe_unused struct coresight_trace_id_map *id_map)
 {
 	struct tpdm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 	int ret = -EINVAL;
@@ -489,6 +490,7 @@ static int tpdm_enable(struct coresight_device *csdev, struct perf_event *event,
 	spin_lock(&drvdata->spinlock);
 	ret = coresight_get_aggre_atid(csdev);
 	if (ret < 0) {
+		coresight_set_mode(csdev, CS_MODE_DISABLED);
 		spin_unlock(&drvdata->spinlock);
 		return ret;
 	}
@@ -1573,7 +1575,8 @@ static struct amba_driver tpdm_driver = {
 };
 
 static int static_tpdm_enable(struct coresight_device *csdev,
-			       struct perf_event *event, enum cs_mode mode)
+			       struct perf_event *event, enum cs_mode mode,
+			       __maybe_unused struct coresight_trace_id_map *id_map)
 {
 	int ret = 0;
 	struct tpdm_drvdata *drvdata =
@@ -1586,8 +1589,10 @@ static int static_tpdm_enable(struct coresight_device *csdev,
 	}
 
 	ret = coresight_get_aggre_atid(csdev);
-	if (ret < 0)
+	if (ret < 0) {
+		coresight_set_mode(csdev, CS_MODE_DISABLED);
 		return ret;
+	}
 
 	drvdata->traceid = ret;
 	coresight_csr_set_etr_atid(csdev, drvdata->traceid, true, NULL);

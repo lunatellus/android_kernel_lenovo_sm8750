@@ -884,7 +884,7 @@ static struct clk_rcg2 disp_cc_mdss_pclk0_clk_src = {
 		.name = "disp_cc_mdss_pclk0_clk_src",
 		.parent_data = disp_cc_parent_data_6,
 		.num_parents = ARRAY_SIZE(disp_cc_parent_data_6),
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
 		.ops = &clk_pixel_ops,
 	},
 	.clkr.vdd_data = {
@@ -907,7 +907,7 @@ static struct clk_rcg2 disp_cc_mdss_pclk1_clk_src = {
 		.name = "disp_cc_mdss_pclk1_clk_src",
 		.parent_data = disp_cc_parent_data_6,
 		.num_parents = ARRAY_SIZE(disp_cc_parent_data_6),
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
 		.ops = &clk_pixel_ops,
 	},
 	.clkr.vdd_data = {
@@ -968,7 +968,7 @@ static struct clk_rcg2 disp_cc_mdss_vsync_clk_src = {
 		.parent_data = disp_cc_parent_data_1,
 		.num_parents = ARRAY_SIZE(disp_cc_parent_data_1),
 		.flags = CLK_SET_RATE_PARENT,
-		.ops = &clk_rcg2_ops,
+		.ops = &clk_rcg2_shared_ops,
 	},
 	.clkr.vdd_data = {
 		.vdd_class = &vdd_mm,
@@ -1787,8 +1787,13 @@ static int disp_cc_sm8250_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	clk_lucid_pll_configure(&disp_cc_pll0, regmap, disp_cc_pll0.config);
-	clk_lucid_pll_configure(&disp_cc_pll1, regmap, disp_cc_pll1.config);
+	if (of_device_is_compatible(pdev->dev.of_node, "qcom,sm8350-dispcc")) {
+		clk_lucid_5lpe_pll_configure(&disp_cc_pll0, regmap, disp_cc_pll0.config);
+		clk_lucid_5lpe_pll_configure(&disp_cc_pll1, regmap, disp_cc_pll1.config);
+	} else {
+		clk_lucid_pll_configure(&disp_cc_pll0, regmap, disp_cc_pll0.config);
+		clk_lucid_pll_configure(&disp_cc_pll1, regmap, disp_cc_pll1.config);
+	}
 
 	/* Enable clock gating for MDP clocks */
 	regmap_update_bits(regmap, 0x8000, 0x10, 0x10);
